@@ -6,8 +6,8 @@ INPUT_FILE = "Data/hospitalInformationSheet.xml"
 OUTPUT_DIRECTORY = "Data/GeneratedFiles"
 
 
-def create_pesel() -> int:
-    return randint(int(1e10), int(1e11 - 1))
+def create_pesel() -> str:
+    return str(randint(int(1e10), int(1e11 - 1)))
 
 
 def create_name() -> str:
@@ -40,6 +40,7 @@ def produce_new_file():
     contents.replace('pesel_', new_pesel)
     contents.replace('name_', new_name)
     contents.replace('date_', new_date)
+    print('Done5')
     # i = 0
     # paragraph = information_sheet.paragraphs[3]
     # # information_sheet.paragraphs[3].text = f"Telefon  0-12/666-55-44	Pacjent: {new_name}    PESEL: {new_pesel}"
