@@ -40,14 +40,12 @@ def print_docx(information_sheet):
 def create_dates():
     """
     Returns list of length 5:
-    [0] - birth date
+    [0] - birthdate
     [1] - arrival at hospital date
     [2] - arrival at hospital hour
     [3] - discharge date
     [4] - discharge hour
     """
-
-    today = datetime.date.today()
 
     # generate birthdate date from 23 to 60 years ago
     birthdate = datetime.date.today() - datetime.timedelta(days=(randint(23, 60) * 365))
@@ -60,13 +58,13 @@ def create_dates():
     discharge_date = arrival_date + datetime.timedelta(days=randint(1, 5))
     discharge_date = discharge_date.replace(hour=randint(10, 16), minute=choice([0, 30]))
 
-
     return [birthdate, arrival_date.strftime('%Y-%m-%d'), arrival_date.strftime('%H:%M'),
             discharge_date.strftime('%Y-%m-%d'), discharge_date.strftime('%H:%M')]
 
 
 def create_phone_number():
     return str(randint(int(1e9), int(1e10 - 1)))
+
 
 def create_address():
     return 'Warszawska 15, Kraków'

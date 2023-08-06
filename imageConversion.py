@@ -17,7 +17,7 @@ def main():
 
     # check if we need to apply thresholding
     if args["preprocess"] == "thresh":
-        gray = cv2.threshold(gray, 0, 255, cv2.THRESH_BINARY | cv2.THRESH_OTSU) [1]
+        gray = cv2.threshold(gray, 0, 255, cv2.THRESH_BINARY | cv2.THRESH_OTSU)[1]
     # check if blur should be used
     elif args["preprocess"] == "blur":
         gray = cv2.medianBlur(gray, 3)
@@ -34,6 +34,7 @@ def main():
     cv2.imshow("Image", image)
     cv2.imshow("Output", gray)
     cv2.waitKey(0)
+
 
 if __name__ == '__main__':
     main()

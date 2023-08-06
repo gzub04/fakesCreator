@@ -1,4 +1,6 @@
 import InitTrainingDocumentsCreator as Docs
+import imageConversion
+import pytesseract
 
 
 def main():
