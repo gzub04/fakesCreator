@@ -1,4 +1,4 @@
-opencv-python~=4.7.0.72
-pytesseract~=0.3.10
+opencv_python_headless~=4.8.0.76
 Pillow~=9.5.0
-python-docx~=0.8.11
+pytesseract~=0.3.10
+python_docx~=0.8.11
