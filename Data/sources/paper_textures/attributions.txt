@@ -1,6 +1,6 @@
 paper_texture_1 - https://unsplash.com/photos/k4Lt0CjUnb0 - Image by João Vítor Duarte on unsplash.com
-paper_texture_2 - https://unsplash.com/photos/-Vc-ok8CeBU - Image by Marjan Blan on unsplash.com
-paper_texture_3 - https://unsplash.com/photos/5Ft4NWTmeJE - Image by Marjan Blan on unsplash.com
-paper_texture_4 - https://www.freepik.com/free-photo/smooth-white-stucco-wall_1037198.htm - Image by kues1 on freepik.com
-paper_texture_5 - https://www.freepik.com/free-photo/paper-texture_1034631.htm - Image by kues1 on freepik.com
-paper_texture_6 - https://www.freepik.com/free-photo/white-simple-textured-design-background_17593748.htm - Image by rawpixel.com on freepik.com
+paper_texture_2 - https://www.freepik.com/free-photo/smooth-white-stucco-wall_1037198.htm - Image by kues1 on freepik.com
+paper_texture_3 - https://www.freepik.com/free-photo/paper-texture_1034631.htm - Image by kues1 on freepik.com
+paper_texture_4 - https://www.freepik.com/free-photo/white-simple-textured-design-background_17593748.htm - Image by rawpixel.com on freepik.com
+paper_texture_5 - https://unsplash.com/photos/-Vc-ok8CeBU - Image by Marjan Blan on unsplash.com
+paper_texture_6 - https://unsplash.com/photos/5Ft4NWTmeJE - Image by Marjan Blan on unsplash.com
