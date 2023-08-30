@@ -1,4 +1,4 @@
-import fakeDataCreator
+import fake_data_creator
 from docx import Document
 
 
@@ -10,7 +10,7 @@ OUTPUT_DIRECTORY = "Data/generated_documents"
 def produce_new_init_document(output_name):
     information_sheet = Document(INPUT_DOCUMENT)
 
-    fake_data = fakeDataCreator.FakeDataCreator()
+    fake_data = fake_data_creator.FakeDataCreator()
     person = fake_data.create_person()
     address = fake_data.create_address()
     dates = fake_data.create_dates()
