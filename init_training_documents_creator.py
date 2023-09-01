@@ -1,13 +1,29 @@
+import glob
+import os
+
+import doc2pdf
+from pdf2image import convert_from_path
+
 import fake_data_creator
 from docx import Document
 
 
 SOURCE_FILES = "Data/sources"
 INPUT_DOCUMENT = f"{SOURCE_FILES}/hospitalInformationSheet.docx"
-OUTPUT_DIRECTORY = "Data/generated_documents"
+OUTPUT_DIRECTORY = "Data/generated_documents/training_documents"
 
 
-def produce_new_init_document(output_name):
+def produce_new_init_document(filename):
+    """
+    Creates and saves a new hospital information sheet as docx document with randomized data
+    :param filename: how should the output file be named
+    :return: Returns 0 if successful, 1 if initial file doesn't exist
+    """
+    os.makedirs(OUTPUT_DIRECTORY)
+
+    if not os.path.exists(INPUT_DOCUMENT):
+        print("Error: Could not find initial training document HospitalInformationSheet.docx")
+        return 1
     information_sheet = Document(INPUT_DOCUMENT)
 
     fake_data = fake_data_creator.FakeDataCreator()
@@ -45,17 +61,40 @@ def produce_new_init_document(output_name):
                              f"data i godzina wypisu pacjenta: {end_date.strftime('%y-%m-%d')}, " \
                              f"{end_date.strftime('%H:%M')}"
 
-    information_sheet.save(f"{OUTPUT_DIRECTORY}/{output_name}")
+    information_sheet.save(f"{OUTPUT_DIRECTORY}/{filename}")
+
+    return 0
 
 
-def create_xml():
-    information_sheet = Document(INPUT_DOCUMENT)
-    with open('HospitalInformationSheet.xml', 'w', encoding='utf-8') as f:
-        f.write(information_sheet._element.xml)
-#
-#
-# def print_docx(information_sheet):
-#     i = 0
-#     for paragraph in information_sheet.paragraphs:
-#         print(f'{i}: {paragraph.text}')
-#         i += 1
+def training_docx_to_jpg():
+    """
+    Converts training images to jpg
+    :return: Returns 0 if successful, 1 if it couldn't find any docx at Data/sources/training_documents
+    """
+    os.makedirs(OUTPUT_DIRECTORY)
+    # change docx to pdf
+    docx_files = glob.glob(os.path.join(OUTPUT_DIRECTORY, "*.docx"))
+    if not docx_files:
+        print("Warning: not docx files found to convert to jpg!")
+        return 1
+    for word_file in docx_files:
+        doc2pdf.convert(word_file)
+
+        if os.path.exists(word_file):
+            os.remove(word_file)
+        else:
+            print(f"Error: Did not find file {word_file}")
+
+    # change pdf to img
+    pdf_files = glob.glob(os.path.join(OUTPUT_DIRECTORY, "*.pdf"))
+    for pdf_file in pdf_files:
+        images = convert_from_path(pdf_file)
+        image_name = pdf_file[:-3] + 'jpg'
+        images[0].save(image_name, "JPEG")
+
+        if os.path.exists(pdf_file):
+            os.remove(pdf_file)
+        else:
+            print(f"Error: Did not find file {pdf_file}")
+
+    return 0
