@@ -1,11 +1,9 @@
 import glob
 import os
-
-import doc2pdf
-from pdf2image import convert_from_path
+from docx import Document
 
 import fake_data_creator
-from docx import Document
+import file_conversion as conv
 
 
 SOURCE_FILES = "Data/sources"
@@ -19,7 +17,6 @@ def produce_new_init_document(filename):
     :param filename: how should the output file be named
     :return: Returns 0 if successful, 1 if initial file doesn't exist
     """
-    os.makedirs(OUTPUT_DIRECTORY)
 
     if not os.path.exists(INPUT_DOCUMENT):
         print("Error: Could not find initial training document HospitalInformationSheet.docx")
@@ -71,30 +68,27 @@ def training_docx_to_jpg():
     Converts training images to jpg
     :return: Returns 0 if successful, 1 if it couldn't find any docx at Data/sources/training_documents
     """
-    os.makedirs(OUTPUT_DIRECTORY)
+
     # change docx to pdf
     docx_files = glob.glob(os.path.join(OUTPUT_DIRECTORY, "*.docx"))
     if not docx_files:
         print("Warning: not docx files found to convert to jpg!")
         return 1
     for word_file in docx_files:
-        doc2pdf.convert(word_file)
-
-        if os.path.exists(word_file):
-            os.remove(word_file)
-        else:
-            print(f"Error: Did not find file {word_file}")
-
-    # change pdf to img
-    pdf_files = glob.glob(os.path.join(OUTPUT_DIRECTORY, "*.pdf"))
-    for pdf_file in pdf_files:
-        images = convert_from_path(pdf_file)
-        image_name = pdf_file[:-3] + 'jpg'
-        images[0].save(image_name, "JPEG")
-
-        if os.path.exists(pdf_file):
-            os.remove(pdf_file)
-        else:
-            print(f"Error: Did not find file {pdf_file}")
+        conv.docx_to_jpg(word_file)
+        os.remove(word_file)
 
     return 0
+
+
+def generate_training_documents(amount):
+    if not os.path.exists(OUTPUT_DIRECTORY):
+        os.makedirs(OUTPUT_DIRECTORY)
+
+    for i in range(amount):
+        output_name = f"training_document_{i}.docx"
+        if produce_new_init_document(output_name):
+            return 1
+
+    if training_docx_to_jpg():
+        return 1
