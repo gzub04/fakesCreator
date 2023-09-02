@@ -2,11 +2,10 @@ from random import randint, choice
 import datetime
 import sys
 
-
 SOURCE_FILES = "Data/sources"
 
 
-def err_exit(*err_msg):
+def err_exit(err_msg):
     print(f'Error: {err_msg}', file=sys.stderr)
     exit(1)
 
@@ -27,20 +26,19 @@ class FakeDataCreator:
                 self.female_last_names = f_female_last_names.readlines()
 
                 self.street_names = f_streets.readlines()
-                self.cities_data = []   # list in format [(city, population)]
+                self.cities_data = []  # list in format [(city, population)]
                 for line in f_cities:
                     city, population = line.strip().split(';')
                     self.cities_data.append((city, int(population)))
 
-
         except FileNotFoundError:
-            print("File Not Found Error: Missing csv files in Data/sources.")
+            print(f"File Not Found Error: Missing csv files in {SOURCE_FILES}.")
             exit(1)
         except PermissionError:
-            print("Permission Error: Can't access csv files in Data/sources.")
+            print(f"Permission Error: Can't access csv files in {SOURCE_FILES}.")
             exit(1)
         except Exception as e:
-            print(f"An error occurred while opening csv files: {str(e)}")
+            print(f"An error occurred while opening csv files in {SOURCE_FILES}: {str(e)}")
             exit(1)
 
     def create_person(self):
@@ -51,7 +49,6 @@ class FakeDataCreator:
         """
         person = {'sex': choice(['M', 'F'])}
 
-
         if person['sex'] == 'M':
             person['first_name'] = choice(self.male_first_names).rstrip('\n').capitalize()
             person['last_name'] = choice(self.male_last_names).rstrip('\n').capitalize()
@@ -61,7 +58,6 @@ class FakeDataCreator:
 
         # generate birthdate date from 23 to 60 years ago
         person['birthdate'] = datetime.date.today() - datetime.timedelta(days=(randint(23, 60) * 365))
-
 
         # PESEL
         p_year = str(person['birthdate'].year)[-2:]  # last two digits of year
@@ -129,22 +125,18 @@ class FakeDataCreator:
     @staticmethod
     def create_dates():
         """
-        Returns list of length 5:
-        [0] - birthdate
-        [1] - arrival at hospital date / start date
-        [2] - arrival at hospital hour / start hour
-        [3] - discharge date / end date
-        [4] - discharge hour / end hour
+        Creates a pair of dates in the past, where second date happens 1-7 days after the first one
+        :return: Dictionary containing keys 'start_date' and 'end_date' that hold datetime() type as values
         """
         dates = dict()
 
         # Generate a random start date between 7 days and 20 years ago
         dates['start_date'] = datetime.datetime.now() - datetime.timedelta(days=randint(7, 365 * 20))
-        dates['start_date'] = dates['start_date'].replace(hour=randint(0, 23), minute=randint(0, 59))
+        dates['start_date'] = dates['start_date'].replace(hour=randint(10, 18), minute=randint(0, 59))
 
         # Generate random discharge date between 1 and 7 days after the arrival date
         dates['end_date'] = dates['start_date'] + datetime.timedelta(days=randint(1, 5))
-        dates['end_date'] = dates['end_date'].replace(hour=randint(10, 16), minute=choice([0, 30]))
+        dates['end_date'] = dates['end_date'].replace(hour=randint(10, 18), minute=randint(0, 59))
 
         return dates
 
