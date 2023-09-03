@@ -1,64 +1,139 @@
 import cv2
-import pytesseract
-from PIL import Image
-import argparse
-import os
+import re
+from fuzzywuzzy import fuzz
+
+import fake_data_creator
 
 
-def create_altered_file(image, options):
-    """
-    Creates files with faked data on them
-    :param image: image read by OpenCV
-    :param options: a set containing all data that is supposed to be changed. Possible options: {name, address, date,
-    phone_number, pesel}
-    :return: file with data changed according to options
-    """
-    gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
-    gray = cv2.threshold(gray, 0, 255, cv2.THRESH_BINARY | cv2.THRESH_OTSU)[1]  # thresholding for better quality
+class FakingFiles:
 
-    text_data = pytesseract.image_to_data(gray, output_type=pytesseract.Output.DICT)
+    def __init__(self, init_cv2_image, read_data):
+        self.fake_data = fake_data_creator.FakeDataCreator()
+        self.init_image = init_cv2_image
+        self.read_data = read_data
+        self.data_to_change = {'type': [],      # what type of word should it be replaced with, e.g. first_name
+                               'top': [],       # coordinates of top border
+                               'left': [],      # coordinate of left border
+                               'width': [],     # width of box
+                               'height': []     # height of box
+                               }
+        self.iterator = 0    # used to iterate through data from tesseract
 
-    # Iterate over the detected text regions
-    for i in range(len(text_data['text'])):
-        # Extract the word and its bounding box coordinates
-        word = text_data['text'][i]
-        x = text_data['left'][i]
-        y = text_data['top'][i]
-        width = text_data['width'][i]
-        height = text_data['height'][i]
+        self.person = None
 
-        # Check if the word matches the target word
-        if word in "Pacjent":
-            # Replace the word with a new word
-            new_word = 'NewWord'
-            text_data['text'][i+1] = new_word
+        self._scan_document()
+
+    @staticmethod
+    def fuzzy_match(keyword, text):
+        similarity_score = fuzz.partial_ratio(keyword.lower(), text.lower())
+
+        if similarity_score >= 85:
+            return True
+        else:
+            return False
+
+    def _scan_document(self):
+        keyword_functions = {
+            "pacjent": self.process_pacjent,
+            "pesel": self.process_pesel,
+            "Adres": self.process_adres,
+            "Data urodzenia": self.process_data_urodzenia,
+            "Data i godzina": self.process_data_i_godzina,
+        }
+
+        # Iterate over the detected text regions
+        while self.iterator < len(self.read_data['text']):
+            for keyword, func in keyword_functions.items():
+                if self.fuzzy_match(keyword, self.read_data['text'][self.iterator]):
+                    if 'pacjenta:' == keyword:
+                        continue
+                    print(self.read_data['text'][self.iterator])
+                    func()
+
+            self.iterator += 1
+
+    def create_altered_file(self, cv_image):
+        """
+        Creates files with faked data on them
+        :param cv_image: image read by OpenCV
+        :return: file with changed data
+        """
+
+        self.person = self.fake_data.create_person()
+
+        # Iterate over the detected text regions
+        for i in range(len(self.data_to_change['type'])):
+            # Extract the word and its bounding box coordinates
+            word = self.person[self.data_to_change['type'][i]]
+            x = self.data_to_change['left'][i]
+            y = self.data_to_change['top'][i]
+            width = self.data_to_change['width'][i]
+            height = self.data_to_change['height'][i]
 
             # Draw a rectangle around the new word on the image
-            cv2.rectangle(image, (x, y), (x + width, y + height), (0, 255, 0), 2)
+            cv2.rectangle(cv_image, (x, y), (x + width, y + height), (0, 255, 0), 2)
 
             # Put the new word at the same location
-            cv2.putText(image, new_word, (x, y - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.9, (0, 255, 0), 2)
+            cv2.putText(cv_image, word, (x, y - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.9, (0, 255, 0), 2)
 
-    # Generate a new image with modified text
-    new_image = image.copy()
 
-    # Iterate over the detected text regions again to update the new image
-    for i in range(len(text_data['text'])):
-        # Extract the updated word and its bounding box coordinates
-        updated_word = text_data['text'][i]
-        x = text_data['left'][i]
-        y = text_data['top'][i]
-        width = text_data['width'][i]
-        height = text_data['height'][i]
+    def process_pacjent(self):
+        print("Pacjent found")  # debug
+        # checks if it found ":" in range in case tesseract split incorrectly or imię i nazwisko is after
+        up_limit = self.iterator + 5 if self.iterator + 5 < len(self.read_data['text']) else len(self.read_data['text'])
+        for i in range(self.iterator, up_limit):
+            # print(f"{i}:{self.read_data['text'][i]}")
+            if ':' in self.read_data['text'][i]:
+                i_to_replace = self.find_next_text_occurrence(i + 1)    # find first name
+                if i_to_replace == -1 or i_to_replace - i > 5:
+                    print('Warning: "Pacjent" found, but no following string, replacement not successful.')
+                    return
+                self._add_to_dict(i_to_replace, 'first_name')
+                # self.replace(i_to_replace, self.person['first_name'])
+                self.iterator = i_to_replace
 
-        # Put the updated word at the same location in the new image
-        cv2.putText(new_image, updated_word, (x, y - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.9, (0, 255, 0), 2)
+                i_to_replace = self.find_next_text_occurrence(i_to_replace + 1)     # find last name
+                if i_to_replace == -1 or i_to_replace - i > 5:
+                    print('Warning: "Pacjent" found, but failed to replace last name.')
+                    return
+                self._add_to_dict(i_to_replace, 'last_name')
+                self.iterator = i_to_replace
+                return
 
-    # Save the new image with modified text
-    cv2.imwrite('path/to/new_image.png', new_image)
+        print('Warning: "Pacjent" found, but could not detect a place to swap')
 
-    # Display the new image with modified text
-    cv2.imshow('New Image with Modified Text', new_image)
-    cv2.waitKey(0)
-    cv2.destroyAllWindows()
-    pass
+    def process_pesel(self):
+        # print("Pesel found")
+        pass
+
+    def process_adres(self):
+        # print("Adres found")
+        pass
+
+    def process_data_urodzenia(self):
+        # print("Data urodzenia found")
+        pass
+
+    def process_data_i_godzina(self):
+        # print("data i godzina found")
+        pass
+
+    def find_next_text_occurrence(self, start_pos):
+        """
+        Finds next instance of a word made out of at least two letters
+        :param start_pos: position from which you want to start looking
+        :return: position of next word occurrence, if it doesn't find anything, returns 0
+        """
+        pattern = r"[a-zA-Z]{2,}"
+        for i in range(start_pos, len(self.read_data['text'])):
+            if re.search(pattern, self.read_data['text'][i]):
+                return i
+
+        return -1
+
+    def _add_to_dict(self, i, type_of_data):
+        self.data_to_change['type'].append(type_of_data)
+        self.data_to_change['top'].append(self.read_data['top'][i])
+        self.data_to_change['left'].append(self.read_data['left'][i])
+        self.data_to_change['width'].append(self.read_data['width'][i])
+        self.data_to_change['height'].append(self.read_data['height'][i])
