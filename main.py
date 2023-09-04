@@ -10,7 +10,7 @@ import image_distorting as distort
 import faking_files
 
 
-FAKE_FILES_PATH = 'Data/generated_documents/faked_files'
+FAKE_FILES_PATH = 'data/generated_documents/faked_files'
 
 
 def parse_arguments():
@@ -38,7 +38,9 @@ def parse_arguments():
 
     if args['showcase']:
         Docs.generate_training_documents(1)
-        args['document'] = "Data/generated_documents/training_documents/training_document_0.jpg"
+        showcase_document = "data/generated_documents/showcase_document.jpg"
+        args['document'] = showcase_document
+        print(f"Initial document for showcase saved at {showcase_document}")
     # if it's not showcase then:
     elif args['type'] is None:
         utils.err_exit("--type of document not given")

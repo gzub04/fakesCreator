@@ -2,7 +2,7 @@ from random import randint, choice
 import datetime
 import sys
 
-SOURCE_FILES = "Data/sources"
+SOURCE_FILES = "data/sources/csv_files"
 
 
 def err_exit(err_msg):
@@ -32,10 +32,10 @@ class FakeDataCreator:
                     self.cities_data.append((city, int(population)))
 
         except FileNotFoundError:
-            print(f"File Not Found Error: Missing csv files in {SOURCE_FILES}.")
+            print(f"File Not Found Error: Missing csv files in {SOURCE_FILES}")
             exit(1)
         except PermissionError:
-            print(f"Permission Error: Can't access csv files in {SOURCE_FILES}.")
+            print(f"Permission Error: Can't access csv files in {SOURCE_FILES}")
             exit(1)
         except Exception as e:
             print(f"An error occurred while opening csv files in {SOURCE_FILES}: {str(e)}")
@@ -126,7 +126,6 @@ class FakeDataCreator:
     def create_dates():
         """
         Creates a pair of dates in the past, where second date happens 1-7 days after the first one
-        :return: Dictionary containing keys 'start_date' and 'end_date' that hold datetime() type as values
         """
         dates = dict()
 

@@ -49,7 +49,7 @@ def pdf_to_jpg(file_path) -> str:
 
 
 def save_test_data_to_csv(read_data):
-    output_file = "Data/generated_documents/output_data.csv"
+    output_file = "data/generated_documents/output_data.csv"
 
     # Open the file for writing
     with open(output_file, "w", encoding="utf-8") as file:

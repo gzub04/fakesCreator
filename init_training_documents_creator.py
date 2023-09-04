@@ -6,9 +6,9 @@ import fake_data_creator
 import utils
 
 
-SOURCE_FILES = "Data/sources"
+SOURCE_FILES = "data/sources"
 INPUT_DOCUMENT = f"{SOURCE_FILES}/hospitalInformationSheet.docx"
-OUTPUT_DIRECTORY = "Data/generated_documents/training_documents"
+OUTPUT_DIRECTORY = "data/generated_documents"
 
 
 def produce_new_init_document(filename):

@@ -5,7 +5,7 @@ from PIL import Image, ImageEnhance  # , ImageFilter
 MAX_SCAN_ROTATION = 1.8
 MAX_PHOTO_ROTATION = None
 
-PAPER_PATH = "Data/sources/paper_textures/"
+PAPER_PATH = "data/sources/paper_textures"
 
 
 class ImageDistorting:
@@ -13,7 +13,7 @@ class ImageDistorting:
         self.paper_textures = []
 
         for texture_num in range(1, 7):
-            path_to_img = f"{PAPER_PATH}paper_texture_{texture_num}.jpg"
+            path_to_img = f"{PAPER_PATH}/paper_texture_{texture_num}.jpg"
             try:
                 with Image.open(path_to_img) as texture:
                     self.paper_textures.append(texture)
