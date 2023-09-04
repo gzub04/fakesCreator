@@ -3,7 +3,7 @@ import os
 from docx import Document
 
 import fake_data_creator
-import file_conversion as conv
+import utils
 
 
 SOURCE_FILES = "Data/sources"
@@ -75,7 +75,7 @@ def training_docx_to_jpg():
         print("Warning: not docx files found to convert to jpg!")
         return 1
     for word_file in docx_files:
-        conv.docx_to_jpg(word_file)
+        utils.docx_to_jpg(word_file)
         os.remove(word_file)
 
     return 0
