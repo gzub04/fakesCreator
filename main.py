@@ -1,26 +1,19 @@
 import argparse
-import sys
 import cv2
+import numpy
 import pytesseract
 from PIL import Image
 
+import utils
 import init_training_documents_creator as Docs
 import image_distorting as distort
-import file_conversion as convert
+import faking_files
 
 
-def err_exit(err_msg):
-    print(f'Error: {err_msg}', file=sys.stderr)
-    exit(1)
+FAKE_FILES_PATH = 'Data/generated_documents/faked_files'
 
 
-def read_document(image_path):
-    image = cv2.imread(image_path)
-    text_data = pytesseract.image_to_data(image, output_type=pytesseract.Output.DICT)
-    print(text_data)
-
-
-def main():
+def parse_arguments():
     parser = argparse.ArgumentParser(
         prog="fakesCreator", description="Allows to make documents look like they've been photographed/scanned and "
                                          "fake them while saving exact coordinates where they were modified."
@@ -48,39 +41,67 @@ def main():
         args['document'] = "Data/generated_documents/training_documents/training_document_0.jpg"
     # if it's not showcase then:
     elif args['type'] is None:
-        err_exit("--type of document not given")
+        utils.err_exit("--type of document not given")
+
+    return args
+
+
+def read_document(image_path):
+    image = cv2.imread(image_path)
+    return pytesseract.image_to_data(image, output_type=pytesseract.Output.DICT, lang='pol')
+
+
+def main():
+    args = parse_arguments()
 
     # check what type of file
     file_wo_extension, extension = args['document'].rsplit('.', 1)
     if extension == 'doc' or extension == 'docx':
-        args['document'] = convert.docx_to_jpg(args['document'])
+        args['document'] = utils.docx_to_jpg(args['document'])
     elif extension == 'pdf':
-        args['document'] = convert.pdf_to_jpg(args['document'])
+        args['document'] = utils.pdf_to_jpg(args['document'])
     elif not extension == 'jpg' and not extension == 'png' and not extension == 'bmp':
-        err_exit(f"Unsupported file extension {extension}!")
+        utils.err_exit(f"Unsupported file extension {extension}!")
+
+    # load initial image to memory
+    init_pil_image = Image.open(args['document']).convert('RGB')
+    init_cv_image = cv2.cvtColor(numpy.array(init_pil_image), cv2.COLOR_RGB2BGR)
 
     # read image
+    if not args['only_distort']:
+        read_data = read_document(args['document'])
+        faker = faking_files.FakingFiles(init_cv_image, read_data)
+        # utils.save_test_data_to_csv(read_data)
 
-    # Distort without rotating
-    init_image = Image.open(args['document'])
     enhancer = distort.ImageDistorting()
 
-    if not args['only_distort']:
-        read_document(args['document'])
+    for i in range(args['n']):
+        new_pil_image = init_pil_image.copy()
 
-    if args['distort_type'] == 'scan':
-        init_image = enhancer.scan_distortion(init_image)
-    elif args['distort_type'] == 'scan':
-        init_image = enhancer.photo_distortion(init_image)
+        # Distort without rotating
+        if args['distort_type'] == 'scan':
+            new_pil_image = enhancer.scan_distortion(new_pil_image)
+        elif args['distort_type'] == 'photo':
+            new_pil_image = enhancer.photo_distortion(new_pil_image)
 
-    # fake the file
+        # Fake the file
+        if not args['only_distort']:
+            new_cv_image = cv2.cvtColor(numpy.array(new_pil_image), cv2.COLOR_RGB2BGR)
+
+            faker.create_altered_file(new_cv_image)
+            cv2.imwrite(f"{FAKE_FILES_PATH}/fake_document_{i}.jpg", new_cv_image)
+
+        new_pil_image.close()
+
+    init_pil_image.close()
 
     # rotate
+    # use cv2
 
     # save file and what changed in it
 
     # TMP
-    init_image.save('Data/generated_documents/output.jpg')
+    # init_pil_image.save('Data/generated_documents/output.jpg')
 
     if args['only_distort'] is not None:
         return 0
