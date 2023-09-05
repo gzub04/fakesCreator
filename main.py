@@ -30,17 +30,14 @@ def parse_arguments():
     parser.add_argument(
         '--only_distort', action='store_true',
         help="If you don't want to fake the file and only apply image distorting. "
-             "Exclusive with all other arguments except --image"
+             "Exclusive with all other arguments except --document and --distort_type"
     )
     parser.add_argument('--distort_type', required=True, choices=['photo', 'scan'],
                         help="How do you want your output image to look like: \"photo\" or \"scan\"")
     args = vars(parser.parse_args())
 
     if args['showcase']:
-        Docs.generate_training_documents(1)
-        showcase_document = "data/generated_documents/showcase_document.jpg"
-        args['document'] = showcase_document
-        print(f"Initial document for showcase saved at {showcase_document}")
+        args['document'] = "data/sources/hospitalInformationSheet.jpg"
     # if it's not showcase then:
     elif args['type'] is None:
         utils.err_exit("--type of document not given")
@@ -77,6 +74,7 @@ def main():
 
     enhancer = distort.ImageDistorting()
 
+    print("Creating new files...")
     for i in range(args['n']):
         new_pil_image = init_pil_image.copy()
 
