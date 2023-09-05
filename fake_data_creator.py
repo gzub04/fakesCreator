@@ -92,7 +92,7 @@ class FakeDataCreator:
         for i in range(10):
             digit = int(pesel_wo_last_number[i])
             result_sum += digit * factors[i % 4]
-        p_control_number = result_sum % 10
+        p_control_number = 10 - result_sum % 10
 
         person['pesel'] = pesel_wo_last_number + str(p_control_number)
 
