@@ -22,9 +22,7 @@ class FakingFiles:
                                'height': []     # height of box
                                }
         self.iterator = 0           # used to iterate through data from tesseract
-        self.date_formats = []      # stores format so here are stored
-        self.date_iterator = 0      #
-
+        self.date_formats = []      # stores format of dates in order
         self._scan_document()
 
     def _scan_document(self):
@@ -35,6 +33,7 @@ class FakingFiles:
             'data': self.process_date,
             'numer telefonu': self.process_phone_number,
             'tel. kontaktowy': self.process_phone_number,
+            'telefon kontaktowy': self.process_phone_number,
             'numer kontaktowy': self.process_phone_number,
             'adres': self.process_adres,    # TODO
         }
@@ -43,7 +42,8 @@ class FakingFiles:
         while self.iterator < len(self.read_data['text']):
             curr_word = self.read_data['text'][self.iterator]
             for keyword, func in keyword_functions.items():
-                if self._fuzzy_match(keyword, curr_word) or (len(self.read_data['text']) > self.iterator + 2 and
+                # check if current word or two next words match with keyword
+                if self._fuzzy_match(keyword, curr_word) or (len(self.read_data['text']) > self.iterator + 1 and
                    self._fuzzy_match(keyword, curr_word + ' ' + self.read_data['text'][self.iterator + 1])):
                     func()
 
@@ -59,15 +59,20 @@ class FakingFiles:
         person = self.fake_data.create_person()
         dates = self.fake_data.create_dates()
         phone_number = self.fake_data.create_phone_number()
+        address = self.fake_data.create_address()
 
         keyword_to_name = {    # converts keyword to proper faked text
-            'name': person['first_name'] + ' ' + person['last_name'],
+            'first_name': person['first_name'],
+            'last_name': person['last_name'],
+            'full_name': person['first_name'] + ' ' + person['last_name'],
             'pesel': person['pesel'],
             'sex': person['sex'],
             'birthdate': person['birthdate'],
             'start_date': dates['start_date'],
             'end_date': dates['end_date'],
             'phone_number': phone_number,
+            'city': address['city'],
+            'street': address['street'],
             'blank': '',
         }
 
@@ -103,18 +108,17 @@ class FakingFiles:
             if ':' in self.read_data['text'][i]:
                 i_to_replace = self._find_next_regex_occurrence(r"[a-zA-Z]{2,}", i + 1)    # find first name
                 if i_to_replace == -1 or i_to_replace - i > 5:
-                    print('Warning: "Pacjent" found, but no following string, replacement not successful.')
+                    print('Warning: "Pacjent" found, but no following string, replacement was not successful.')
                     return
                 self.iterator = i_to_replace
 
-                i_to_replace_2 = self._find_next_regex_occurrence(r"[a-zA-Z]{2,}", i_to_replace + 1)  # find last name
-                if i_to_replace_2 == -1 or i_to_replace_2 - i > 5:
+                i_last_name = self._find_next_regex_occurrence(r"[a-zA-Z]{2,}", i_to_replace + 1)  # find last name
+                if i_last_name == -1 or i_last_name - i > 5:
                     print('Warning: "Pacjent" found, but failed to replace last name.')
+                    self._add_to_dict(i_to_replace, 'first_name')   # add only first name
                     return
-                # first cover surname, then paste full name
-                self._add_to_dict(i_to_replace_2, 'blank')
-                self._add_to_dict(i_to_replace, 'name')
-                self.iterator = i_to_replace_2
+                self._add_to_dict_multiple_merge(i_to_replace, 'full_name', 2)   # replace both first_name and last_name
+                self.iterator = i_last_name
                 return
 
         print('Warning: "Pacjent" found, but could not detect a place to swap')
@@ -188,7 +192,33 @@ class FakingFiles:
         self.iterator = i_to_replace
 
     def process_adres(self):
-        # print("Adres found")
+        # NOT DONE
+        return
+        # checks if it found ":" in range in case tesseract split incorrectly or some text after
+        up_limit = self.iterator + 5 if self.iterator + 5 < len(self.read_data['text']) else len(self.read_data['text'])
+        for i in range(self.iterator, up_limit):
+            if ':' in self.read_data['text'][i]:
+                i_to_replace = self._find_next_regex_occurrence(r"[a-zA-Z]{2,}", i + 1)  # find city or street
+                if i_to_replace == -1 or i_to_replace - i > 5:
+                    print('Warning: "Pacjent" found, but no following string, replacement not successful.')
+                    return
+                # if next is number, indicating that it's street, and it's number, not city
+                if self._find_next_regex_occurrence(r"\d+/\d+", i_to_replace + 1) < self._find_next_regex_occurrence(
+                                                    r"[a-zA-Z]{2,}", i_to_replace + 1):
+                    pass
+                self.iterator = i_to_replace
+
+                i_to_replace_2 = self._find_next_regex_occurrence(r"[a-zA-Z]{2,}", i_to_replace + 1)  # find last name
+                if i_to_replace_2 == -1 or i_to_replace_2 - i > 5:
+                    print('Warning: "Pacjent" found, but failed to replace last name.')
+                    return
+                # first cover surname, then paste full name
+                self._add_to_dict(i_to_replace_2, 'blank')
+                self._add_to_dict(i_to_replace, 'last_name')
+                self.iterator = i_to_replace_2
+                return
+
+        print('Warning: "Pacjent" found, but could not detect a place to swap')
         pass
 
     @staticmethod
@@ -212,14 +242,49 @@ class FakingFiles:
 
         return -1
 
-    def _add_to_dict(self, i, type_of_data):
+    def _add_to_dict(self, position, type_of_data):
         self.data_to_change['type'].append(type_of_data)
-        self.data_to_change['top'].append(self.read_data['top'][i])
-        self.data_to_change['left'].append(self.read_data['left'][i])
-        self.data_to_change['width'].append(self.read_data['width'][i])
-        self.data_to_change['height'].append(self.read_data['height'][i])
+        self.data_to_change['top'].append(self.read_data['top'][position])
+        self.data_to_change['left'].append(self.read_data['left'][position])
+        self.data_to_change['width'].append(self.read_data['width'][position])
+        self.data_to_change['height'].append(self.read_data['height'][position])
+
+    def _add_to_dict_multiple_merge(self, position, type_of_data, num_to_merge):
+        """
+        Adds to a dictionary multiple words in a row as a single entry, with box containing all symbols
+        :param position:
+        :param type_of_data:
+        :param num_to_merge:
+        :return:
+        """
+        self.data_to_change['type'].append(type_of_data)
+        top = 0
+        bottom = float('inf')
+        left = float('inf')
+        right = 0
+        for i in range(num_to_merge):
+            curr_top = self.read_data['top'][position + i]
+            curr_left = self.read_data['left'][position + i]
+            curr_width = self.read_data['width'][position + i]
+            curr_height = self.read_data['height'][position + i]
+
+            top = max(top, curr_top)
+            bottom = min(bottom, curr_top - curr_height)
+            left = min(left, curr_left)
+            right = max(right, curr_left + curr_width)
+
+        self.data_to_change['top'].append(top)
+        self.data_to_change['left'].append(left)
+        self.data_to_change['width'].append(right - left)
+        self.data_to_change['height'].append(top - bottom)
 
     def _next_date_position_and_formatting(self, start_pos):
+        """
+        Returns index at which next date is found and how it is formatted
+        :param start_pos: position from which it should look for date
+        :return: returns a list with [index, formatting] where first one is information about where date is
+                 and formatting is the formatting of date compatible with datetime.strftime()
+        """
         output = output_2 = None
         regex = r"\d{2}([-.\/])\d{2}\1\d{4}"
         date_location = self._find_next_regex_occurrence(regex, start_pos)
