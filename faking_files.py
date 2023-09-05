@@ -31,11 +31,12 @@ class FakingFiles:
             'płeć': self.process_plec,
             'pesel': self.process_pesel,
             'data': self.process_date,
+            'godzina': self.process_godzina,
             'numer telefonu': self.process_phone_number,
             'tel. kontaktowy': self.process_phone_number,
             'telefon kontaktowy': self.process_phone_number,
             'numer kontaktowy': self.process_phone_number,
-            'adres': self.process_adres,    # TODO
+            'adres': self.process_adres,
         }
 
         # Iterate over the detected text regions
@@ -70,6 +71,7 @@ class FakingFiles:
             'birthdate': person['birthdate'],
             'start_date': dates['start_date'],
             'end_date': dates['end_date'],
+            'time': dates['start_date'].strftime("%H:%M"),
             'phone_number': phone_number,
             'city': address['city'],
             'street': address['street'],
@@ -108,13 +110,14 @@ class FakingFiles:
             if ':' in self.read_data['text'][i]:
                 i_to_replace = self._find_next_regex_occurrence(r"[a-zA-Z]{2,}", i + 1)    # find first name
                 if i_to_replace == -1 or i_to_replace - i > 5:
-                    print('Warning: "Pacjent" found, but no following string, replacement was not successful.')
+                    print(f"Warning: \"{self.read_data[i_to_replace]}\" found, "
+                          f"but no following string, replacement was not successful.")
                     return
                 self.iterator = i_to_replace
 
                 i_last_name = self._find_next_regex_occurrence(r"[a-zA-Z]{2,}", i_to_replace + 1)  # find last name
                 if i_last_name == -1 or i_last_name - i > 5:
-                    print('Warning: "Pacjent" found, but failed to replace last name.')
+                    print(f"Warning: \"{self.read_data[i_to_replace]}\" found, but failed to replace last name.")
                     self._add_to_dict(i_to_replace, 'first_name')   # add only first name
                     return
                 self._add_to_dict_multiple_merge(i_to_replace, 'full_name', 2)   # replace both first_name and last_name
@@ -182,6 +185,15 @@ class FakingFiles:
         print(f"'Warning: \"{self.read_data['text'][self.iterator]}\" found, "
               f"but failed to find date to replace.")
 
+    def process_godzina(self):
+        i_to_replace = self._find_next_regex_occurrence(r"([0-9]|0[0-9]|1[0-9]|2[0-3]):[0-5][0-9]", self.iterator + 1)
+        if i_to_replace == -1 or i_to_replace - self.iterator > 5:
+            print(f"'Warning: \"{self.read_data['text'][self.iterator]}\" found, "
+                  f"but failed to find time to replace.")
+            return
+        self._add_to_dict(i_to_replace, 'time')
+        self.iterator = i_to_replace
+
     def process_phone_number(self):
         i_to_replace = self._find_next_regex_occurrence(r"\+?[1-9][0-9]{7,14}", self.iterator + 1)
         if i_to_replace == -1 or i_to_replace - self.iterator > 5:
@@ -192,34 +204,31 @@ class FakingFiles:
         self.iterator = i_to_replace
 
     def process_adres(self):
-        # NOT DONE
-        return
         # checks if it found ":" in range in case tesseract split incorrectly or some text after
         up_limit = self.iterator + 5 if self.iterator + 5 < len(self.read_data['text']) else len(self.read_data['text'])
         for i in range(self.iterator, up_limit):
             if ':' in self.read_data['text'][i]:
                 i_to_replace = self._find_next_regex_occurrence(r"[a-zA-Z]{2,}", i + 1)  # find city or street
                 if i_to_replace == -1 or i_to_replace - i > 5:
-                    print('Warning: "Pacjent" found, but no following string, replacement not successful.')
+                    print(f"Warning: \"{self.read_data[self.iterator]}\" found, "
+                          f"but no following string, replacement not successful.")
                     return
-                # if next is number, indicating that it's street, and it's number, not city
-                if self._find_next_regex_occurrence(r"\d+/\d+", i_to_replace + 1) < self._find_next_regex_occurrence(
-                                                    r"[a-zA-Z]{2,}", i_to_replace + 1):
-                    pass
-                self.iterator = i_to_replace
-
-                i_to_replace_2 = self._find_next_regex_occurrence(r"[a-zA-Z]{2,}", i_to_replace + 1)  # find last name
-                if i_to_replace_2 == -1 or i_to_replace_2 - i > 5:
-                    print('Warning: "Pacjent" found, but failed to replace last name.')
-                    return
-                # first cover surname, then paste full name
-                self._add_to_dict(i_to_replace_2, 'blank')
-                self._add_to_dict(i_to_replace, 'last_name')
-                self.iterator = i_to_replace_2
+                # check if next is number, indicating that it's a street and its number, not city
+                next_number = self._find_next_regex_occurrence(r"\d+/\d+", i_to_replace + 1)
+                next_word = self._find_next_regex_occurrence(r"[a-zA-Z]{2,}", i_to_replace + 1)
+                if next_number < next_word:
+                    self._add_to_dict_multiple_merge(i_to_replace, 'street', next_number - i_to_replace + 1)
+                    self._add_to_dict(next_word, 'city')
+                    self.iterator = next_word
+                else:
+                    # city first, street after
+                    self._add_to_dict(i_to_replace, 'city')
+                    self._add_to_dict_multiple_merge(next_word, 'street', next_number - next_word + 1)
+                    self.iterator = next_number - next_word + 1
                 return
 
-        print('Warning: "Pacjent" found, but could not detect a place to swap')
-        pass
+        print(f"Warning: \"{self.read_data[self.iterator]}\" found, "
+              f"but no following string, replacement not successful.")
 
     @staticmethod
     def _fuzzy_match(keyword, text):
