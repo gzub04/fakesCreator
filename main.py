@@ -21,7 +21,7 @@ def parse_arguments():
 
     mode = parser.add_mutually_exclusive_group(required=True)
     mode.add_argument('-d', '--document', type=str, help="Path to the input document, "
-                                                         "supported types: jpg, png, bmp, pdf, doc, docx")
+                                                         "supported types: jpg, png, bmp, pdf, odt, doc, docx")
     mode.add_argument('--showcase', action='store_true', help="Creates testing document, applies filters and fakes it.")
 
     parser.add_argument('-n', type=int, required=True, help="Number of new documents to create")
@@ -55,16 +55,19 @@ def main():
 
     # check what type of file
     file_wo_extension, extension = args['document'].rsplit('.', 1)
-    if extension == 'doc' or extension == 'docx':
+    if extension == 'doc' or extension == 'docx' or extension == 'odt':
         args['document'] = utils.docx_to_jpg(args['document'])
     elif extension == 'pdf':
         args['document'] = utils.pdf_to_jpg(args['document'])
     elif not extension == 'jpg' and not extension == 'png' and not extension == 'bmp':
         utils.err_exit(f"Unsupported file extension {extension}!")
+    if args['document'] == '':
+        print("Initial image not found")
+        exit(1)
 
     # load initial image to memory
-    init_pil_image = Image.open(args['document']).convert('RGB')
-    init_cv_image = cv2.cvtColor(numpy.array(init_pil_image), cv2.COLOR_RGB2BGR)
+    init_pil_image = Image.open(args['document'])
+    init_cv_image = utils.pil_image_to_cv2(init_pil_image)
 
     # read image
     if not args['only_distort']:

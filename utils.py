@@ -1,6 +1,10 @@
 import os
 import sys
+
+import cv2
 import doc2pdf
+import numpy
+from PIL import Image
 from pdf2image import convert_from_path
 
 
@@ -16,8 +20,10 @@ def docx_to_jpg(file_path) -> str:
     :return: path to generated jpg
     """
     file_wo_extension, extension = file_path.rsplit('.', 1)
-    if not extension == 'doc' and not extension == 'docx':
-        print("Error: expected .doc or .docx file!")
+    extensions = ['odt', 'doc', 'docx']
+    if extension not in extensions:
+        print("Error: Expected one of the following extensions: ", end='')
+        print(*extensions, sep=', ')
         return ''
 
     doc2pdf.convert(file_path)
@@ -43,6 +49,14 @@ def pdf_to_jpg(file_path) -> str:
     images[0].save(image_name, "JPEG")
 
     return image_name
+
+
+def pil_image_to_cv2(pil_image):
+    return cv2.cvtColor(numpy.array(pil_image.convert('RGB')), cv2.COLOR_RGB2BGR)
+
+
+def cv2_image_to_pil(cv2_image):
+    return Image.fromarray(cv2.cvtColor(cv2_image, cv2.COLOR_BGR2RGB))
 
 
 # ---------- helpers for testing code ----------
