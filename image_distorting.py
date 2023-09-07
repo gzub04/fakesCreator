@@ -24,9 +24,6 @@ class ImageDistorting:
             except PermissionError:
                 print(f"Permission Error: Can't access {path_to_img}")
                 exit(1)
-            except Exception as e:
-                print(f"An error occurred while handling {path_to_img}: {str(e)}")
-                exit(1)
 
     def _apply_paper_texture(self, image):
         if random.randint(1, 10) == 10:
