@@ -1,10 +1,11 @@
 import cv2
 import re
 
-
+from PIL import Image, ImageDraw, ImageFont
 from fuzzywuzzy import fuzz
 
 import fake_data_creator
+import utils
 
 FONT_PATH = 'data/sources/Arial.ttf'
 
@@ -94,11 +95,14 @@ class FakingFiles:
             width = self.data_to_change['width'][i]
             height = self.data_to_change['height'][i]
 
-            # Draw a rectangle around the new text on the image
-            cv2.rectangle(cv_image, (x, y), (x + width, y + height), (0, 255, 0), 2)
+            # put text on the image
+            box_with_text = self._get_box_with_text(text, width, height)
+            box_width = box_with_text.shape[1]
+            cv_image[y:y+height, x:x+box_width] = box_with_text
 
-            # Put the new text at the same location
-            cv2.putText(cv_image, text, (x, y - 10), cv2.FONT_HERSHEY_COMPLEX, height/30, (0, 255, 0), 2)
+            # debug showcase
+            # cv2.rectangle(cv_image, (x, y), (x + box_width, y + height), (0, 255, 0), 2)
+            # cv2.putText(cv_image, text, (x, y - 10), cv2.FONT_HERSHEY_COMPLEX, height/30, (0, 255, 0), 2)
 
     def process_pacjent(self):
         current = self.read_data['text'][self.iterator].rstrip()
@@ -136,7 +140,6 @@ class FakingFiles:
         self.iterator = i_to_replace
 
     def process_pesel(self):
-        # checks if it found ":" in range in case tesseract split incorrectly or imię i nazwisko is after
         i_to_replace = self._find_next_regex_occurrence(r"^\d{11}$", self.iterator + 1)
         if i_to_replace == -1 or i_to_replace - self.iterator > 5:
             print(f"'Warning: \"{self.read_data['text'][self.iterator]}\" found, "
@@ -152,7 +155,7 @@ class FakingFiles:
         range_limit = self.iterator + 4
         for i in range(self.iterator, range_limit):
             i_of_next_word = self._find_next_regex_occurrence(r"[A-Za-z]{2,}", i)
-            if i_of_next_word != -1 and i < range_limit:
+            if i_of_next_word != -1 and i_of_next_word < range_limit:
                 next_word = self.read_data['text'][i]
                 nearest_words.append(next_word)
 
@@ -230,15 +233,6 @@ class FakingFiles:
         print(f"Warning: \"{self.read_data[self.iterator]}\" found, "
               f"but no following string, replacement not successful.")
 
-    @staticmethod
-    def _fuzzy_match(keyword, text):
-        similarity_score = fuzz.ratio(keyword.lower(), text.lower())
-
-        if similarity_score >= 80:
-            return True
-        else:
-            return False
-
     def _find_next_regex_occurrence(self, pattern, start_pos):
         """
         Finds next instance of a word made out of at least two letters
@@ -261,7 +255,7 @@ class FakingFiles:
     def _add_to_dict_multiple_merge(self, position, type_of_data, num_to_merge):
         """
         Adds to a dictionary multiple words in a row as a single entry, with box containing all symbols
-        :param position:
+        :param position: position in self.read_data
         :param type_of_data:
         :param num_to_merge:
         :return:
@@ -294,18 +288,18 @@ class FakingFiles:
         :return: returns a list with [index, formatting] where first one is information about where date is
                  and formatting is the formatting of date compatible with datetime.strftime()
         """
-        output = output_2 = None
+        output = output_2 = None    # they store [regex, date_formatting, date]
         regex = r"\d{2}([-.\/])\d{2}\1\d{4}"
         date_location = self._find_next_regex_occurrence(regex, start_pos)
         if date_location != -1:
             date = self.read_data['text'][date_location]
 
             if '-' in date:
-                output = [date_location, re.sub(regex, "%d-%m-%Y", date)]
+                output = [date_location, "%d-%m-%Y"]
             elif '.' in date:
-                output = [date_location, re.sub(regex, "%d.%m.%Y", date)]
+                output = [date_location, "%d.%m.%Y"]
             elif '/' in date:
-                output = [date_location, re.sub(regex, "%d/%m/%Y", date)]
+                output = [date_location, "%d/%m/%Y"]
 
         regex = r"\d{4}([-.\/])\d{2}\1\d{2}"
         date_location = self._find_next_regex_occurrence(regex, start_pos)
@@ -313,19 +307,44 @@ class FakingFiles:
             date = self.read_data['text'][date_location]
 
             if '-' in date:
-                output_2 = [date_location, re.sub(regex, "%Y-%m-%d", date)]
+                output_2 = [date_location, "%Y-%m-%d"]
             elif '.' in date:
-                output_2 = [date_location, re.sub(regex, "%Y.%m.%d", date)]
+                output_2 = [date_location, "%Y.%m.%d"]
             elif '/' in date:
-                output_2 = [date_location, re.sub(regex, "%Y/%m/%d", date)]
+                output_2 = [date_location, "%Y/%m/%d"]
 
         if output is None and output_2 is None:
             return -1, ''
-        elif output_2 is None:
+        elif output_2 is None or output[0] < output_2[0]:
             return output
-        elif output is None:
+        elif output is None or output_2[0] < output[0]:
             return output_2
-        elif output[0] < output_2[0]:
-            return output
-        elif output_2[0] < output[0]:
-            return output_2
+
+    @staticmethod
+    def _fuzzy_match(keyword, text):
+        similarity_score = fuzz.ratio(keyword.lower(), text.lower())
+
+        if similarity_score >= 80:
+            return True
+        else:
+            return False
+
+    @staticmethod
+    def _get_box_with_text(text, width, height):
+        text_box = Image.new('RGB', (width, height), color='white')
+
+        fontsize = 1
+        font = ImageFont.truetype(FONT_PATH, fontsize)
+
+        # iterate until the text size is just larger than the criteria
+        while font.getbbox(text)[3] < text_box.height:
+            fontsize += 1
+            font = ImageFont.truetype(FONT_PATH, fontsize)
+
+        if font.getlength(text) > text_box.width:
+            text_box = text_box.resize((int(font.getlength(text, language='pl')), text_box.height))
+
+        draw = ImageDraw.Draw(text_box)
+        draw.text((0, 0), text, font=font, fill=(0, 0, 0, 255))   # put text on img
+
+        return utils.pil_image_to_cv2(text_box)  # return in cv2 format
