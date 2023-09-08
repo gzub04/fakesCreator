@@ -53,9 +53,9 @@ class FakingFiles:
 
     def create_altered_file(self, cv_image):
         """
-        Creates files with faked data on them
+        Creates files with faked data on them and information what has changed
         :param cv_image: image read by OpenCV
-        :return: file with changed data
+        :return: list of dictionaries containing information of what changed in a file
         """
         date_iterator = 0
         person = self.fake_data.create_person()
@@ -79,6 +79,7 @@ class FakingFiles:
             'blank': '',
         }
 
+        changes_in_file = []  # list of boxes changed
         # Iterate over the detected text regions
         for i in range(len(self.data_to_change['type'])):
             # Extract the text and its bounding box coordinates
@@ -99,10 +100,19 @@ class FakingFiles:
             box_with_text = self._get_box_with_text(text, width, height)
             box_width = box_with_text.shape[1]
             cv_image[y:y+height, x:x+box_width] = box_with_text
-
             # debug showcase
             # cv2.rectangle(cv_image, (x, y), (x + box_width, y + height), (0, 255, 0), 2)
             # cv2.putText(cv_image, text, (x, y - 10), cv2.FONT_HERSHEY_COMPLEX, height/30, (0, 255, 0), 2)
+            altered_box = {
+                'text': text,
+                'top_left': (x, y),
+                'top_right': (x + box_width, y),
+                'bottom_left': (x, y + height),
+                'bottom_right': (x + box_width, y + height),
+            }
+            changes_in_file.append(altered_box)
+
+        return changes_in_file
 
     def process_pacjent(self):
         current = self.read_data['text'][self.iterator].rstrip()
