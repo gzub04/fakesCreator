@@ -1,16 +1,20 @@
 import argparse
+import os
+
 import cv2
-import numpy
 import pytesseract
 from PIL import Image
+import json
+from math import sin, cos, radians
 
 import utils
-import init_training_documents_creator as Docs
 import image_distorting as distort
 import faking_files
 
 
 FAKE_FILES_PATH = 'data/generated_documents/faked_files'
+JSON_DIR_PATH = 'data/output_json'
+JSON_NAME = 'file_changes.json'
 
 
 def parse_arguments():
@@ -50,6 +54,43 @@ def read_document(image_path):
     return pytesseract.image_to_data(image, output_type=pytesseract.Output.DICT, lang='pol')
 
 
+def adjust_coordinates(init_document_info, rotation_info, pil_image):
+    """
+    Adjust coordinates from before the rotation to after the rotation
+    :param init_document_info: a list of changes in file, changes must be dicts with keys:
+    text, top_left, top_right, bottom_left, bottom_right, where all but text are coordinates of changes
+    :param rotation_info: by how many degrees was image rotated
+    :param pil_image: rotated pillow image
+    :return: Returns a new list of changes in file with adjusted coordinates
+    """
+    rotation = radians(- rotation_info['rotation'])
+    x_increase = rotation_info['width_increase'] // 2
+    y_increase = rotation_info['height_increase'] // 2
+    width, height = pil_image.size
+    center = [width // 2, height // 2]
+
+    for box in init_document_info:
+        for key, value in box.items():
+            if key == 'text':  # if not coordinates
+                continue
+
+            x, y = value
+            # adjust starting location before rotating
+            new_x = x + x_increase
+            new_y = y + y_increase
+
+            # rotate coordinates
+            new_x = (new_x - center[0]) * cos(rotation) - (new_y - center[1]) * sin(rotation) + center[0]
+            new_y = (new_x - center[0]) * sin(rotation) + (new_y - center[1]) * cos(rotation) + center[1]
+
+            new_x = int(new_x)
+            new_y = int(new_y)
+
+            box[key] = [new_x, new_y]
+
+    return init_document_info
+
+
 def main():
     args = parse_arguments()
 
@@ -65,6 +106,10 @@ def main():
         print("Initial image not found")
         exit(1)
 
+    # create necessary paths
+    if not os.path.exists(FAKE_FILES_PATH):
+        os.makedirs(FAKE_FILES_PATH)
+
     # load initial image to memory
     init_pil_image = Image.open(args['document'])
     init_cv_image = utils.pil_image_to_cv2(init_pil_image)
@@ -78,8 +123,10 @@ def main():
     enhancer = distort.ImageDistorting()
 
     print("Creating new files...")
+    changes = {}    # dictionary containing changes on all faked files
     for i in range(args['n']):
         new_pil_image = init_pil_image.copy()
+        new_document_name = f"distorted_document_{i}"
 
         # Distort without rotating
         if args['distort_type'] == 'scan':
@@ -89,25 +136,34 @@ def main():
 
         # Fake the file
         if not args['only_distort']:
-            new_cv_image = cv2.cvtColor(numpy.array(new_pil_image), cv2.COLOR_RGB2BGR)
+            new_cv_image = utils.pil_image_to_cv2(new_pil_image)
 
-            faker.create_altered_file(new_cv_image)
-            cv2.imwrite(f"{FAKE_FILES_PATH}/fake_document_{i}.jpg", new_cv_image)
+            new_document_name = f"fake_document_{i}.jpg"
+            document_changes = faker.create_altered_file(new_cv_image)
 
+            new_pil_image.close()
+            new_pil_image = utils.cv2_image_to_pil(new_cv_image)
+
+        # rotate image to make it look more realistic
+        new_pil_image, rotation_info = enhancer.rotate_img(new_pil_image, args['distort_type'])
+
+        if not args['only_distort']:
+            document_changes = adjust_coordinates(document_changes, rotation_info, new_pil_image)
+            changes[new_document_name] = document_changes
+
+        new_pil_image.save(f"{FAKE_FILES_PATH}/{new_document_name}")
         new_pil_image.close()
 
     init_pil_image.close()
 
-    # rotate
-    # use cv2
+    # save to
+    if not args['only_distort']:
+        if not os.path.exists(JSON_DIR_PATH):
+            os.makedirs(JSON_DIR_PATH)
 
-    # save file and what changed in it
-
-    # TMP
-    # init_pil_image.save('Data/generated_documents/output.jpg')
-
-    if args['only_distort'] is not None:
-        return 0
+        json_object = json.dumps(changes, indent=4, ensure_ascii=False)
+        with open(f'{JSON_DIR_PATH}/{JSON_NAME}', "w", encoding="utf-8") as f_out:
+            f_out.write(json_object)
 
 
 if __name__ == '__main__':
