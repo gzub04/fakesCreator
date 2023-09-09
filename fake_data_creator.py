@@ -1,3 +1,4 @@
+import random
 from random import randint, choice
 import datetime
 import sys
@@ -18,12 +19,14 @@ class FakeDataCreator:
                     open(f'{SOURCE_FILES}/female_firstnames.csv', 'r', encoding='utf-8') as f_female_first_names, \
                     open(f'{SOURCE_FILES}/female_lastnames.csv', 'r', encoding='utf-8') as f_female_last_names, \
                     open(f'{SOURCE_FILES}/cities.csv', 'r', encoding='utf-8') as f_cities, \
-                    open(f'{SOURCE_FILES}/street_names.csv', 'r', encoding='utf-8') as f_streets:
+                    open(f'{SOURCE_FILES}/street_names.csv', 'r', encoding='utf-8') as f_streets, \
+                    open(f'{SOURCE_FILES}/company_names.csv', 'r', encoding='utf-8') as f_company_names:
 
                 self.male_first_names = f_male_first_names.readlines()
                 self.male_last_names = f_male_last_names.readlines()
                 self.female_first_names = f_female_first_names.readlines()
                 self.female_last_names = f_female_last_names.readlines()
+                self.company_names = f_company_names.readlines()
 
                 self.street_names = f_streets.readlines()
                 self.cities_data = []  # list in format [(city, population)]
@@ -121,6 +124,32 @@ class FakeDataCreator:
         if randint(1, 100) > 55:  # chance for someone to live in a flat
             address['street'] += '/' + str(randint(1, 100))
         return address
+
+    def create_company(self):
+        nums = [random.randint(0, 9) for _ in range(5)]  # for zip code
+        zip_code = f"{nums[0]}{nums[1]}-{nums[2]}{nums[3]}{nums[4]}"
+        NIP = random_digits = ''.join(random.choice('0123456789') for _ in range(10))
+        address = self.create_address()
+        company = {
+            'name': choice(self.company_names).rstrip('\n').capitalize(),
+            'zip_and_city': f"{zip_code}, {address['city']}",
+            'street': address['street'],
+            'NIP': NIP,
+        }
+
+        return company
+
+    @staticmethod
+    def create_price(netto):
+        brutto = 1.23 * round(netto, 0)
+        vat = 0.23 * brutto
+        netto = brutto - vat
+        price = {
+            'netto': netto,
+            'vat': vat,
+            'brutto': brutto
+        }
+        return price
 
     @staticmethod
     def create_dates():
