@@ -1,16 +1,16 @@
 import argparse
+import json
 import os
+from math import sin, cos, radians
 
 import cv2
 import pytesseract
 from PIL import Image
-import json
-from math import sin, cos, radians
+from progress.bar import Bar
 
-import utils
-import image_distorting as distort
 import faking_files
-
+import image_distorting as distort
+import utils
 
 FAKE_FILES_PATH = 'data/generated_documents/faked_files'
 JSON_DIR_PATH = 'data/output_json'
@@ -23,28 +23,28 @@ def parse_arguments():
                                          "fake them while saving exact coordinates where they were modified."
     )
 
-    mode = parser.add_mutually_exclusive_group(required=True)
-    mode.add_argument('-d', '--document', type=str, help="Path to the input document, "
-                                                         "supported types: jpg, png, bmp, pdf, odt, doc, docx")
-    mode.add_argument('--showcase', action='store_true', help="Creates testing document, applies filters and fakes it.")
+    # mode = parser.add_mutually_exclusive_group(required=True)
+    parser.add_argument('-d', '--document', type=str, required=True,
+                        help="Path to the input document, supported types: jpg, png, bmp, pdf, odt, doc, docx")
+    parser.add_argument('--showcase', action='store_true', help="Creates an new image, marking with red boxes "
+                                                                "all data that would be replaced")
 
-    parser.add_argument('-n', type=int, required=True, help="Number of new documents to create")
-    parser.add_argument('-t', '--type', type=str,
+    parser.add_argument('-n', type=int, help="Number of new documents to create")
+    parser.add_argument('-t', '--type', type=str, required=True,
                         help="Type of document to modify: \"HospitalInformationSheet\" or \"invoice\"")
     parser.add_argument(
         '--only_distort', action='store_true',
         help="If you don't want to fake the file and only apply image distorting. "
              "Exclusive with all other arguments except --document and --distort_type"
     )
-    parser.add_argument('--distort_type', required=True, choices=['photo', 'scan'],
+    parser.add_argument('--distort_type', choices=['photo', 'scan'],
                         help="How do you want your output image to look like: \"photo\" or \"scan\"")
     args = vars(parser.parse_args())
 
-    if args['showcase']:
-        args['document'] = "data/sources/hospitalInformationSheet.jpg"
-    # if it's not showcase then:
-    elif args['type'] is None:
-        utils.err_exit("--type of document not given")
+    if args['showcase'] and any([args['n'], args['distort_type']]) and args['only_distort'] is True:
+        utils.err_exit("--showcase can only be used only with --document and --type")
+    elif all(arg is None for arg in [args['n'], args['distort_type']]):
+        utils.err_exit("Missing -n or --distort_type arguments")
 
     return args
 
@@ -71,7 +71,7 @@ def adjust_coordinates(init_document_info, rotation_info, pil_image):
 
     for box in init_document_info:
         for key, value in box.items():
-            if key == 'text':  # if not coordinates
+            if key not in ['top_left', 'top_right', 'bottom_left', 'bottom_right']:  # if not coordinates
                 continue
 
             x, y = value
@@ -103,12 +103,16 @@ def main():
     elif not extension == 'jpg' and not extension == 'png' and not extension == 'bmp':
         utils.err_exit(f"Unsupported file extension {extension}!")
     if args['document'] == '':
-        print("Initial image not found")
-        exit(1)
+        utils.err_exit("Initial image not found")
 
-    # create necessary paths
+    # set up paths
     if not os.path.exists(FAKE_FILES_PATH):
         os.makedirs(FAKE_FILES_PATH)
+    files = os.listdir(FAKE_FILES_PATH)
+    for file in files:
+        file_path = os.path.join(FAKE_FILES_PATH, file)
+        if os.path.isfile(file_path):
+            os.remove(file_path)
 
     # load initial image to memory
     init_pil_image = Image.open(args['document'])
@@ -120,39 +124,54 @@ def main():
         faker = faking_files.FakingFiles(init_cv_image, read_data)
         # utils.save_test_data_to_csv(read_data)
 
+    # if it's just showcase
+    if args['showcase']:
+        font_size = faker.data_to_change['height'][0] / 30
+        for i in range(len(faker.data_to_change['type'])):
+            text = faker.data_to_change['type'][i]
+            x = faker.data_to_change['left'][i]
+            y = faker.data_to_change['top'][i]
+            width = faker.data_to_change['width'][i]
+            height = faker.data_to_change['height'][i]
+            cv2.rectangle(init_cv_image, (x, y), (x + width, y + height), (0, 0, 255), 2)
+            cv2.putText(init_cv_image, text, (x, y - 10), cv2.FONT_HERSHEY_COMPLEX, font_size, (0, 0, 255), 1)
+        cv2.imwrite(f'{FAKE_FILES_PATH}/showcase.jpg', init_cv_image)
+        return 0
+
     enhancer = distort.ImageDistorting()
 
-    print("Creating new files...")
-    changes = {}    # dictionary containing changes on all faked files
-    for i in range(args['n']):
-        new_pil_image = init_pil_image.copy()
-        new_document_name = f"distorted_document_{i}"
+    changes = {}  # dictionary containing changes on all faked files
+    with Bar("Creating new files...") as bar:
+        for i in range(args['n']):
+            new_pil_image = init_pil_image.copy()
+            new_document_name = f"distorted_document_{i}.jpg"
 
-        # Distort without rotating
-        if args['distort_type'] == 'scan':
-            new_pil_image = enhancer.scan_distortion(new_pil_image)
-        elif args['distort_type'] == 'photo':
-            new_pil_image = enhancer.photo_distortion(new_pil_image)
+            # Distort without rotating
+            if args['distort_type'] == 'scan':
+                new_pil_image = enhancer.scan_distortion(new_pil_image)
+            elif args['distort_type'] == 'photo':
+                new_pil_image = enhancer.photo_distortion(new_pil_image)
 
-        # Fake the file
-        if not args['only_distort']:
-            new_cv_image = utils.pil_image_to_cv2(new_pil_image)
+            # Fake the file
+            if not args['only_distort']:
+                new_cv_image = utils.pil_image_to_cv2(new_pil_image)
 
-            new_document_name = f"fake_document_{i}.jpg"
-            document_changes = faker.create_altered_file(new_cv_image)
+                new_document_name = f"fake_document_{i}.jpg"
+                document_changes = faker.create_altered_file(new_cv_image)
 
+                new_pil_image.close()
+                new_pil_image = utils.cv2_image_to_pil(new_cv_image)
+
+            # rotate image to make it look more realistic
+            new_pil_image, rotation_info = enhancer.rotate_img(new_pil_image, args['distort_type'])
+
+            if not args['only_distort']:
+                document_changes = adjust_coordinates(document_changes, rotation_info, new_pil_image)
+                changes[new_document_name] = document_changes
+
+            new_pil_image.save(f"{FAKE_FILES_PATH}/{new_document_name}")
             new_pil_image.close()
-            new_pil_image = utils.cv2_image_to_pil(new_cv_image)
-
-        # rotate image to make it look more realistic
-        new_pil_image, rotation_info = enhancer.rotate_img(new_pil_image, args['distort_type'])
-
-        if not args['only_distort']:
-            document_changes = adjust_coordinates(document_changes, rotation_info, new_pil_image)
-            changes[new_document_name] = document_changes
-
-        new_pil_image.save(f"{FAKE_FILES_PATH}/{new_document_name}")
-        new_pil_image.close()
+            bar.next()
 
     init_pil_image.close()
 

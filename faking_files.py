@@ -97,13 +97,15 @@ class FakingFiles:
             height = self.data_to_change['height'][i]
 
             # put text on the image
-            box_with_text = self._get_box_with_text(text, width, height)
+            colour = self._most_common_colour(cv_image)
+            box_with_text = self._get_box_with_text(text, width, height, colour)
             box_width = box_with_text.shape[1]
-            cv_image[y:y+height, x:x+box_width] = box_with_text
+            cv_image[y:y + height, x:x + box_width] = box_with_text
             # debug showcase
             # cv2.rectangle(cv_image, (x, y), (x + box_width, y + height), (0, 255, 0), 2)
             # cv2.putText(cv_image, text, (x, y - 10), cv2.FONT_HERSHEY_COMPLEX, height/30, (0, 255, 0), 2)
             altered_box = {
+                'type': current_keyword,
                 'text': text,
                 'top_left': (x, y),
                 'top_right': (x + box_width, y),
@@ -245,9 +247,10 @@ class FakingFiles:
 
     def _find_next_regex_occurrence(self, pattern, start_pos):
         """
-        Finds next instance of a word made out of at least two letters
+        Finds next instance of a word according to a regex pattern
+        :param pattern: regex pattern to find
         :param start_pos: position from which you want to start looking
-        :return: position of next word occurrence, if it doesn't find anything, returns 0
+        :return: position of next word occurrence, if it doesn't find anything, returns -1
         """
         for i in range(start_pos, len(self.read_data['text'])):
             if re.search(pattern, self.read_data['text'][i]):
@@ -298,7 +301,7 @@ class FakingFiles:
         :return: returns a list with [index, formatting] where first one is information about where date is
                  and formatting is the formatting of date compatible with datetime.strftime()
         """
-        output = output_2 = None    # they store [regex, date_formatting, date]
+        output = output_2 = None  # they store [date_location, date_formatting]
         regex = r"\d{2}([-.\/])\d{2}\1\d{4}"
         date_location = self._find_next_regex_occurrence(regex, start_pos)
         if date_location != -1:
@@ -340,8 +343,8 @@ class FakingFiles:
             return False
 
     @staticmethod
-    def _get_box_with_text(text, width, height):
-        text_box = Image.new('RGB', (width, height), color='white')
+    def _get_box_with_text(text, width, height, colour):
+        text_box = Image.new('RGB', (width, height), colour)
 
         fontsize = 1
         font = ImageFont.truetype(FONT_PATH, fontsize)
@@ -355,6 +358,13 @@ class FakingFiles:
             text_box = text_box.resize((int(font.getlength(text, language='pl')), text_box.height))
 
         draw = ImageDraw.Draw(text_box)
-        draw.text((0, 0), text, font=font, fill=(0, 0, 0, 255))   # put text on img
+        draw.text((0, 0), text, font=font, fill=(0, 0, 0, 255))  # put text on img
 
         return utils.pil_image_to_cv2(text_box)  # return in cv2 format
+
+    @staticmethod
+    def _most_common_colour(cv2_image):
+        a2D = cv2_image.reshape(-1, cv2_image.shape[-1])
+        col_range = (256, 256, 256)  # generically : a2D.max(0)+1
+        a1D = np.ravel_multi_index(a2D.T, col_range)
+        return np.unravel_index(np.bincount(a1D).argmax(), col_range)
