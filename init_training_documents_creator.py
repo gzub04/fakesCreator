@@ -8,7 +8,7 @@ import utils
 
 SOURCE_FILES = "data/sources"
 INPUT_DOCUMENT = f"{SOURCE_FILES}/hospitalInformationSheet.docx"
-OUTPUT_DIRECTORY = "data/generated_documents"
+OUTPUT_DIRECTORY = "output"
 
 
 def produce_new_init_document(filename):

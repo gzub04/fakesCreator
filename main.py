@@ -12,8 +12,8 @@ import faking_files
 import image_distorting as distort
 import utils
 
-FAKE_FILES_PATH = 'data/generated_documents/faked_files'
-JSON_DIR_PATH = 'data/output_json'
+FAKE_FILES_PATH = 'output/faked_files'
+JSON_DIR_PATH = 'output/output_json'
 JSON_NAME = 'file_changes.json'
 
 
@@ -43,7 +43,7 @@ def parse_arguments():
 
     if args['showcase'] and any([args['n'], args['distort_type']]) and args['only_distort'] is True:
         utils.err_exit("--showcase can only be used only with --document and --type")
-    elif all(arg is None for arg in [args['n'], args['distort_type']]):
+    elif not args['showcase'] and all(arg is None for arg in [args['n'], args['distort_type']]):
         utils.err_exit("Missing -n or --distort_type arguments")
 
     return args
@@ -121,7 +121,7 @@ def main():
     # read image
     if not args['only_distort']:
         read_data = read_document(args['document'])
-        faker = faking_files.FakingFiles(init_cv_image, read_data)
+        faker = faking_files.FakingFiles(init_cv_image, read_data, args['type'])
         # utils.save_test_data_to_csv(read_data)
 
     # if it's just showcase
@@ -134,7 +134,11 @@ def main():
             width = faker.data_to_change['width'][i]
             height = faker.data_to_change['height'][i]
             cv2.rectangle(init_cv_image, (x, y), (x + width, y + height), (0, 0, 255), 2)
-            cv2.putText(init_cv_image, text, (x, y - 10), cv2.FONT_HERSHEY_COMPLEX, font_size, (0, 0, 255), 1)
+            if args['type'] == 'invoice':
+                out_coordinates = (x + width + 10, y)
+            else:
+                out_coordinates = (x, y - 10)
+            cv2.putText(init_cv_image, text, out_coordinates, cv2.FONT_HERSHEY_DUPLEX, font_size, (0, 0, 255), 1)
         cv2.imwrite(f'{FAKE_FILES_PATH}/showcase.jpg', init_cv_image)
         return 0
 

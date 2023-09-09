@@ -12,13 +12,14 @@ BACKGROUND_PATH = 'data/sources/textures/img_background.jpg'
 class ImageDistorting:
     def __init__(self):
         self.paper_textures = []
+        self.background = None
 
         # paper textures
         for texture_num in range(1, 7):
             path_to_img = f"{PAPER_PATH}/paper_texture_{texture_num}.jpg"
             try:
-                with Image.open(path_to_img) as texture:
-                    self.paper_textures.append(texture)
+                texture = Image.open(path_to_img)
+                self.paper_textures.append(texture)
 
             except FileNotFoundError:
                 print(f"File Not Found Error: Missing {path_to_img}")
@@ -29,8 +30,8 @@ class ImageDistorting:
 
         # background texture
         try:
-            with Image.open(BACKGROUND_PATH) as background_texture:
-                self.background = background_texture
+            background_texture = Image.open(BACKGROUND_PATH)
+            self.background = background_texture
         except FileNotFoundError:
             print(f"File Not Found Error: Missing {BACKGROUND_PATH}")
             exit(1)
@@ -48,9 +49,9 @@ class ImageDistorting:
         paper_texture = self.paper_textures[choice]
 
         texture_image = paper_texture.resize(image.size)
-        image = Image.blend(image, texture_image, 0.5)
+        image_w_texture = Image.blend(image, texture_image, 0.5)
 
-        return image
+        return image_w_texture
 
     def rotate_img(self, pil_image, img_type):
         """
@@ -61,14 +62,16 @@ class ImageDistorting:
         """
 
         if img_type == 'scan':
-            max_rotation = 2
-            rotation = random.uniform(-max_rotation, max_rotation)
-            output_image = pil_image.rotate(rotation, expand=True, fillcolor=(255, 255, 255, 255))
+            rotation = random.uniform(-MAX_SCAN_ROTATION, MAX_SCAN_ROTATION)
+            output_image = pil_image.rotate(
+                rotation, expand=True, fillcolor=(255, 255, 255, 255), resample=Image.BICUBIC
+            )
         elif img_type == 'photo':
-            max_rotation = 4
-            rotation = random.uniform(-max_rotation, max_rotation)
+            rotation = random.uniform(-MAX_PHOTO_ROTATION, MAX_PHOTO_ROTATION)
             # Rotate and expand the image, filling empty space with black
-            rotated_pil_image = pil_image.rotate(rotation, expand=True, fillcolor=(0, 0, 0, 0))
+            rotated_pil_image = pil_image.rotate(
+                rotation, expand=True, fillcolor=(0, 0, 0, 0), resample=Image.BICUBIC
+            )
             # Create a mask
             mask = rotated_pil_image.convert('L').point(lambda x: 255 if x > 0 else 0)
             # resize the background and paste
@@ -95,28 +98,19 @@ class ImageDistorting:
 
         return output_image, changes
 
+    def photo_distortion(self, pil_image):
+        output_image = self._apply_paper_texture(pil_image)
 
-    @staticmethod
-    def photo_distortion(pil_image):
-        # Adjust brightness and contrast
-        enhancer = ImageEnhance.Brightness(pil_image)
-        pil_image = enhancer.enhance(1)
+        # Adjust brightness and blur
+        enhancer = ImageEnhance.Brightness(output_image)
+        brightness = random.uniform(0.75, 1)
+        output_image = enhancer.enhance(brightness)
 
-        enhancer = ImageEnhance.Contrast(pil_image)
-        pil_image = enhancer.enhance(1)
+        enhancer = ImageEnhance.Sharpness(output_image)
+        sharpness = random.uniform(-1, 3)
+        output_image = enhancer.enhance(-sharpness)
 
-        enhancer = ImageEnhance.Sharpness(pil_image)
-        pil_image = enhancer.enhance(1)
-
-        return pil_image
-        #
-        # # Add drop shadow using image convolution
-        # shadow_mask = Image.new("L", image.size)
-        # shadow_mask.paste(100, offset=(shadow_offset_x, shadow_offset_y))
-        # image = Image.composite(image, Image.new("RGBA", image.size), shadow_mask)
-
-        # pil_image.save("Testing.jpg")
-        # pil_image.show()
+        return output_image
 
     @staticmethod
     def scan_distortion(pil_image):

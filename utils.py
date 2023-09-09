@@ -63,7 +63,7 @@ def cv2_image_to_pil(cv2_image):
 
 
 def save_test_data_to_csv(read_data):
-    output_file = "data/generated_documents/output_data.csv"
+    output_file = "output/output_data.csv"
 
     # Open the file for writing
     with open(output_file, "w", encoding="utf-8") as file:
