@@ -342,7 +342,6 @@ class FakingFiles:
         # handles address
         zip_and_city_data = self._find_nearby_words(zip_and_city_i)
         # if one of the 2 last chars is a digit, it also contains the street
-        print(zip_and_city_data[2]) #db
         if zip_and_city_data[2][-1].isdigit() or zip_and_city_data[2][-2].isdigit():
             self._add_to_dict_multiple_merge(zip_and_city_data[0], 'zip_city_street',
                                              zip_and_city_data[1] - zip_and_city_data[0] + 1)
