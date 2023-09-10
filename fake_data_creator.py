@@ -140,14 +140,14 @@ class FakeDataCreator:
         return company
 
     @staticmethod
-    def create_prices(netto):
-        brutto = 1.23 * netto
-        vat = 0.23 * brutto
-        netto = brutto - vat
+    def create_prices(net):
+        gross = 1.23 * net
+        vat = 0.23 * gross
+        net = gross - vat
         price = {
-            'netto': netto,
+            'net': net,
             'vat': vat,
-            'brutto': brutto,
+            'gross': gross,
         }
         return price
 

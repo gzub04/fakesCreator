@@ -21,11 +21,11 @@ class FakingFiles:
         self.init_image = init_cv2_image
         self.read_data = read_data
         self.fake_data = fake_data_creator.FakeDataCreator()
-        self.data_to_change = {'type': [],      # what type of word should it be replaced with, e.g. first_name
-                               'top': [],       # coordinates of top border
-                               'left': [],      # coordinate of left border
-                               'width': [],     # width of box
-                               'height': []     # height of box
+        self.data_to_change = {'type': [],  # what type of word should it be replaced with, e.g. first_name
+                               'top': [],  # coordinates of top border
+                               'left': [],  # coordinate of left border
+                               'width': [],  # width of box
+                               'height': []  # height of box
                                }
         self._i = 0  # used to iterate through data from tesseract
         self._date_formats = []  # stores format of dates in order
@@ -89,9 +89,9 @@ class FakingFiles:
         :return: list of dictionaries containing information of what changed in a file
         """
         iterators = {
-            'netto': 0,
+            'net': 0,
             'vat': 0,
-            'brutto': 0,
+            'gross': 0,
             'date': 0,
         }
         person = self.fake_data.create_person()
@@ -123,20 +123,25 @@ class FakingFiles:
                 'seller_name': seller['name'],
                 'seller_zip_and_city': seller['zip_and_city'],
                 'seller_street': seller['street'],
+                'seller_zip_city_street': buyer['zip_and_city'] + ', ' + buyer['street'],
                 'seller_NIP': seller['NIP'],
                 'buyer_name': buyer['name'],
                 'buyer_zip_and_city': buyer['zip_and_city'],
                 'buyer_street': buyer['street'],
+                'buyer_zip_city_street': buyer['zip_and_city'] + ', ' + buyer['street'],
                 'buyer_NIP': buyer['NIP'],
                 'recipient_name': recipient['name'],
                 'recipient_zip_and_city': recipient['zip_and_city'],
                 'recipient_street': recipient['street'],
+                'recipient_zip_city_street': buyer['zip_and_city'] + ', ' + buyer['street'],
                 'recipient_NIP': recipient['NIP'],
                 'full_name': person['first_name'] + ' ' + person['last_name'],
+                'zip_and_city': buyer['zip_and_city'],
+                'street': buyer['street'],
                 'date': dates['start_date'],
-                'netto_price': 'netto',     # all prices are stored in prices dict
+                'net_price': 'net',  # all prices are stored in prices dict
                 'vat_price': 'vat',
-                'brutto_price': 'brutto',
+                'gross_price': 'gross',
                 'blank': ' ',
             }
 
@@ -314,95 +319,127 @@ class FakingFiles:
     def process_participant(self):
         participant = self.read_data['text'][self._i]
         # prefixes only applicable only if party is a company
-        if self._fuzzy_match('Sprzedawca', participant):
+        if 'sprzedawca' in participant.lower():
             prefix = 'seller_'
-        elif self._fuzzy_match('Nabywca', participant):
+        elif 'nabywca' in participant.lower():
             prefix = 'buyer_'
-        else:
+        elif 'odbiorca' in participant.lower():
             prefix = 'recipient_'
+        else:
+            return
 
         x_min = self.read_data['left'][self._i]
         x_max = self.read_data['left'][self._i] + self.read_data['width'][self._i]
-        name = self._find_regex_occurrence_vertical(r"[A-Za-z]{3,}", self._i, 'down', (x_min, x_max))
-        if name == -1:
+        name_i = self._find_regex_occurrence_below(r"[A-Za-z]{3,}", self._i, (x_min, x_max))
+        zip_and_city_i = self._find_regex_occurrence_below(r"^\d{2}-\d{3}$", name_i, (x_min, x_max))
+        street_i = self._find_regex_occurrence_below(r"[A-Za-z]{3,}", name_i, (x_min, x_max))
+
+        if name_i == -1 or zip_and_city_i == -1 or street_i == -1:
             print(f"Warning: Found \"{self.read_data['text'][self._i]}\", but "
-                  f"could not find information about the party")
+                  f"could not find full information about the party")
             return
 
-        zip_and_city = self._find_regex_occurrence_vertical(r"\d{2}-\d{3}", name, 'down', (x_min, x_max))
-        if zip_and_city == -1:
-            print(f"Warning: Found \"{self.read_data['text'][self._i]}\", but couldn't find party's zip code")
+        # handles address
+        zip_and_city_data = self._find_nearby_words(zip_and_city_i)
+        # if one of the 2 last chars is a digit, it also contains the street
+        print(zip_and_city_data[2]) #db
+        if zip_and_city_data[2][-1].isdigit() or zip_and_city_data[2][-2].isdigit():
+            self._add_to_dict_multiple_merge(zip_and_city_data[0], 'zip_city_street',
+                                             zip_and_city_data[1] - zip_and_city_data[0] + 1)
+        else:
+            if self._are_on_same_height(street_i, zip_and_city_i):  # make sure they're on different lines
+                street_i = self._find_regex_occurrence_below(r"[A-Za-z]{3,}", street_i, (x_min, x_max))
+                if street_i == -1:  # check again
+                    print(f"Warning: Found \"{self.read_data['text'][self._i]}\", but "
+                          f"could not find party's street name")
+                    return
 
-        street = self._find_regex_occurrence_vertical(r"[A-Za-z]{3,}", name, 'down', (x_min, x_max))
-        if street == -1:
-            print(f"Warning: Found \"{self.read_data['text'][self._i]}\", but couldn't find party's street name")
-        elif self._are_on_same_height(street, zip_and_city):
-            street = self._find_regex_occurrence_vertical(r"[A-Za-z]{3,}", street, 'down', (x_min, x_max))
-        if street == -1:    # check again
-            print(f"Warning: Found \"{self.read_data['text'][self._i]}\", but couldn't find party's street name")
+            full_street_name = self._find_nearby_words(street_i)[2]
+            # look for address - word(s) that end with a number or number and a letter
+            while street_i != -1 and not (full_street_name[-1].isdigit() or full_street_name[-2].isdigit()) and \
+                    full_street_name.len() < 30:
+                street_i = self._find_regex_occurrence_below(r"[A-Za-z]{3,}", street_i, (x_min, x_max))
+                full_street_name = self._find_nearby_words(street_i)[2]
+            if street_i == -1:
+                print(f"Warning: Found \"{self.read_data['text'][self._i]}\", but "
+                      f"could not find party's street name")
+            self._find_nearby_and_add_to_dict(zip_and_city_i, 'zip_and_city')
+            self._find_nearby_and_add_to_dict(street_i, 'street')
 
         # if no NIP, it's a private person
-        NIP = self._find_regex_occurrence_vertical(r"^NIP:?$", name, 'down', (x_min, x_max))
+        NIP = self._find_regex_occurrence_below(r"^NIP:?$", name_i, (x_min, x_max))
         if NIP == -1:
             print(f"Warning: Found \"{self.read_data['text'][self._i]}\", but could not find \"NIP\". "
                   f"Assuming it's a private person.")
-            self._find_nearby_and_add_to_dict(name, 'full_name')
-        else:
-            NIP_num = self._find_next_regex_occurrence(r"\d{10}\b", NIP)
-            # different name and no NIP if private person
+            self._find_nearby_and_add_to_dict(name_i, 'full_name')
+        else:   # if company
+            NIP_num = self._find_next_regex_occurrence(r"^\d{10}$", NIP)
             if NIP_num == -1 or NIP - NIP_num > 5:
-                # in the off-chance there is word "NIP", but no number
+                # different name and no NIP if private person in the off-chance there is word "NIP", but no number
                 print(f"Warning: Found \"{self.read_data['text'][self._i]}\" and "
                       f"\"{self.read_data['text'][NIP]}\", but couldn't find company's NIP number. "
                       f"Assuming it's a private person")
-                self._find_nearby_and_add_to_dict(name, 'full_name')
-                self._find_nearby_and_add_to_dict(NIP_num, 'blank')
+                self._find_nearby_and_add_to_dict(name_i, 'full_name')
             else:
-                self._find_nearby_and_add_to_dict(name, prefix + 'name')
-                self._find_nearby_and_add_to_dict(NIP_num, prefix + 'NIP')
-
-        self._find_nearby_and_add_to_dict(zip_and_city, prefix + 'zip_and_city')
-        self._find_nearby_and_add_to_dict(street, prefix + 'street')
+                self._find_nearby_and_add_to_dict(name_i, prefix + 'name')
+                self._add_to_dict(NIP_num, prefix + 'NIP')
 
     def process_price(self):
         fuzzy_price_type = self.read_data['text'][self._i]
         if self._fuzzy_match(fuzzy_price_type, 'netto'):
-            price_type = 'netto_price'
+            price_type = 'net_price'
         elif self._fuzzy_match(fuzzy_price_type, 'vat'):
             if self._fuzzy_match(self.read_data['text'][self._i - 1], 'faktura'):
                 return
             else:
                 price_type = 'vat_price'
         elif self._fuzzy_match(fuzzy_price_type, 'brutto'):
-            price_type = 'brutto_price'
+            price_type = 'gross_price'
         else:
             utils.err_exit("Unknown price type")
 
         # get the closest price and string below, once price is below string, it means we've found all relevant prices
         x_min = self.read_data['left'][self._i]
         x_max = self.read_data['left'][self._i] + self.read_data['width'][self._i]
-        next_price_i = self._find_regex_occurrence_vertical(r"\d+[.,]\d?", self._i, 'down', (x_min, x_max))
-        next_string_i = self._find_regex_occurrence_vertical(r"[A-Za-z]{3,}", self._i, 'down', (x_min, x_max))
+        next_price_i = self._find_regex_occurrence_below(r"\d+[.,]\d+", self._i, (x_min, x_max))
+        price_column_end = self._find_regex_occurrence_below(r"[A-Za-z]{3,}", self._i, (x_min, x_max))
 
-        if next_string_i == -1:
-            next_string_height = self.init_image.shape[0]     # height of image
+        if next_price_i == -1:
+            print(f"Warning: Price below \"{self.read_data['text'][self._i]}\" not found.")
+            return
+        if price_column_end == -1:
+            next_string_top = self.init_image.shape[0]  # height of image
+        elif self._are_on_same_height(next_price_i, price_column_end):
+            price_column_end = self._find_regex_occurrence_below(r"[A-Za-z]{3,}", price_column_end, (x_min, x_max))
+            if price_column_end == -1:
+                next_string_top = self.init_image.shape[0]
+            else:
+                next_string_top = self.read_data['top'][price_column_end]
         else:
-            next_string_height = self.read_data['top'][next_string_i]
+            next_string_top = self.read_data['top'][price_column_end]
 
-        while self.read_data['top'][next_price_i] < next_string_height and next_price_i != -1:
-            # change to int and apply multipliers
+        while self.read_data['top'][next_price_i] < next_string_top and next_price_i != -1:
+            # change to int
             next_price_int = self.read_data['text'][next_price_i]
+            next_price_int = re.sub(r"[^0-9.,]", '', next_price_int)  # clean the number
             if ',' in next_price_int:
                 next_price_int = float(next_price_int.replace(',', '.'))
             else:
                 next_price_int = float(next_price_int)
 
             # create prices and append them where needed
-            if price_type == 'netto_price':
+            if price_type == 'net_price':
                 self._prices_list.append(self.fake_data.create_prices(next_price_int))
             self._add_to_dict(next_price_i, price_type)
 
-            next_price_i = self._find_regex_occurrence_vertical(r"\d+([.,]\d+)?", next_price_i, 'down', (x_min, x_max))
+            # iterate to next price
+            next_price_i = self._find_regex_occurrence_below(r"\d+([.,]\d+)?", next_price_i, (x_min, x_max))
+            # verify if price and column end aren't on the same height - if they are, column end is text like PLN and
+            # not actual end of prices
+            if self._are_on_same_height(next_price_i, price_column_end):
+                price_column_end = self._find_regex_occurrence_below(r"[A-Za-z]{3,}", price_column_end, (x_min, x_max))
+                if price_column_end == -1:
+                    next_string_top = self.init_image.shape[0]
 
     def _find_next_regex_occurrence(self, pattern, start_pos):
         """
@@ -417,35 +454,67 @@ class FakingFiles:
 
         return -1
 
-    def _find_regex_occurrence_vertical(self, pattern, start_pos, direction, x_range):
+    def _find_regex_occurrence_below(self, pattern, start_pos, x_range):
         """
-        Finds next instance of a word vertically according to regex pattern. If there are multiple words underneath
+        Finds next instance of a word below according to regex pattern. If there are multiple words underneath
         in the same line, prioritizes the leftmost word
         :param pattern: regex pattern to find
         :param start_pos: index of a word from which to start looking
-        :param direction: 'up' or 'down'
         :param x_range: range (min_x, max_x) in which at least part of the word is found
         :return: Index of next word occurrence, if it doesn't find anything, returns -1
         """
 
         min_x, max_x = x_range
+        start_top = self.read_data['top'][start_pos]
 
-        if direction == 'up':
-            i_range = range(start_pos, -1, -1)
-        else:
-            i_range = range(start_pos, len(self.read_data['text']))
+        # if direction == 'up':
+        #     i_range = range(start_pos, -1, -1)
+        # else:
+        #     i_range = range(start_pos, len(self.read_data['text']))
 
-        for i in i_range:
+        best_pos = -1
+        best_top = self.init_image.shape[0]     # height of the image
+
+        for i in range(start_pos, len(self.read_data['text'])):
             text = self.read_data['text'][i]
+            top = self.read_data['top'][i]
             left_border = self.read_data['left'][i]
             right_border = self.read_data['left'][i] + self.read_data['width'][i]
 
-            if re.search(pattern, text) and (min_x < left_border < max_x or min_x < right_border < max_x or
-                                             left_border < min_x < right_border or left_border < max_x < right_border):
-                # before returning i, check if it didn't match starting string
-                if not self._are_on_same_height(start_pos, i):
-                    return i
-        return -1
+            # if pattern matches AND more or less below the word AND are not at the same height AND
+            # below the starting position
+            if re.search(pattern, text) and \
+                    (
+                            min_x < left_border < max_x or min_x < right_border < max_x or
+                            left_border < min_x < right_border or left_border < max_x < right_border
+                    ) and \
+                    not self._are_on_same_height(start_pos, i) and \
+                    top > start_top:
+                # check if better than current best
+                if best_top > top:
+                    best_top = top
+                    best_pos = i
+
+        for i in range(start_pos, -1, -1):
+            text = self.read_data['text'][i]
+            top = self.read_data['top'][i]
+            left_border = self.read_data['left'][i]
+            right_border = self.read_data['left'][i] + self.read_data['width'][i]
+            # if pattern matches AND more or less below the word AND are not at the same height AND
+            # below the starting position
+            if re.search(pattern, text) and \
+                    (
+                            min_x < left_border < max_x or min_x < right_border < max_x or
+                            left_border < min_x < right_border or left_border < max_x < right_border
+                    ) and \
+                    not self._are_on_same_height(start_pos, i) and \
+                    top > start_top:
+                # check if better than current best
+                if best_top < top:
+                    best_top = top
+                    best_pos = i
+
+        return best_pos
 
     def _find_nearby_words(self, index):
         """
@@ -461,21 +530,21 @@ class FakingFiles:
         # first check backwards
         for i in range(index, 0, -1):
             curr_left = self.read_data['left'][i]
-            next_right = self.read_data['left'][i-1] + self.read_data['width'][i-1]
+            prev_right = self.read_data['left'][i - 1] + self.read_data['width'][i - 1]
 
             # check if close enough and not in another row
-            if not (0 < curr_left - next_right < max_distance) or not self._are_on_same_height(i, i - 1):
+            if not (0 < curr_left - prev_right < max_distance) or not self._are_on_same_height(i, i - 1):
                 start = i
                 break
 
         for i in range(start, len(self.read_data['text'])):
             output_string += self.read_data['text'][i] + ' '
 
-            if i + 1 >= len(self.read_data['text']):    # check if next exists
+            if i + 1 >= len(self.read_data['text']):  # check if next exists
                 end = i
                 break
             curr_right = self.read_data['left'][i] + self.read_data['width'][i]
-            next_left = self.read_data['left'][i+1]
+            next_left = self.read_data['left'][i + 1]
 
             # check if close enough and not in another row
             if not (0 < next_left - curr_right < max_distance) or not self._are_on_same_height(i, i + 1):
@@ -487,9 +556,9 @@ class FakingFiles:
         # check if not already edited
         for i in range(len(self.data_to_change['type'])):
             if self.data_to_change['top'][i] == self.read_data['top'][position] and \
-               self.data_to_change['left'][i] == self.read_data['left'][position] and \
-               self.data_to_change['width'][i] == self.read_data['width'][position] and \
-               self.data_to_change['height'][i] == self.read_data['height'][position]:
+                    self.data_to_change['left'][i] == self.read_data['left'][position] and \
+                    self.data_to_change['width'][i] == self.read_data['width'][position] and \
+                    self.data_to_change['height'][i] == self.read_data['height'][position]:
                 print(f"Warning: Trying to overwrite already detected box. Type of data: {type_of_data}")
                 return
 
@@ -539,8 +608,9 @@ class FakingFiles:
         :return: returns a list with [index, formatting] where first one is information about where date is
                  and formatting is the formatting of date compatible with datetime.strftime()
         """
-        output = output_2 = None  # they store [date_location, date_formatting]
-        regex = r"\d{2}([-.\/])\d{2}\1\d{4}"
+        output = None  # they store [date_location, date_formatting]
+        output_2 = None
+        regex = r"^\d{2}([-.\/])\d{2}\1\d{4}$"
         date_location = self._find_next_regex_occurrence(regex, start_pos)
         if date_location != -1:
             date = self.read_data['text'][date_location]
@@ -552,7 +622,7 @@ class FakingFiles:
             elif '/' in date:
                 output = [date_location, "%d/%m/%Y"]
 
-        regex = r"\d{4}([-.\/])\d{2}\1\d{2}"
+        regex = r"^\d{4}([-.\/])\d{2}\1\d{2}$"
         date_location = self._find_next_regex_occurrence(regex, start_pos)
         if date_location != -1:
             date = self.read_data['text'][date_location]
@@ -572,7 +642,7 @@ class FakingFiles:
             return output_2
         elif output[0] < output_2[0]:
             return output
-        elif output_2[0] < output[0]:
+        elif output_2[0] <= output[0]:
             return output_2
 
     def _are_on_same_height(self, index_1, index_2):

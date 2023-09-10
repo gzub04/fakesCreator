@@ -123,9 +123,10 @@ def main():
         read_data = read_document(args['document'])
         faker = faking_files.FakingFiles(init_cv_image, read_data, args['type'])
         # utils.save_test_data_to_csv(read_data)
+        # exit(0)
 
     # if it's just showcase
-    if args['showcase']:
+    if args['showcase'] and len(faker.data_to_change['type']) > 0:
         font_size = faker.data_to_change['height'][0] / 30
         for i in range(len(faker.data_to_change['type'])):
             text = faker.data_to_change['type'][i]
@@ -141,6 +142,8 @@ def main():
             cv2.putText(init_cv_image, text, out_coordinates, cv2.FONT_HERSHEY_DUPLEX, font_size, (0, 0, 255), 1)
         cv2.imwrite(f'{FAKE_FILES_PATH}/showcase.jpg', init_cv_image)
         return 0
+    elif args['showcase']:
+        utils.err_exit("No data to change was found")
 
     enhancer = distort.ImageDistorting()
 
