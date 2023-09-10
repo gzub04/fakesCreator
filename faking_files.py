@@ -67,7 +67,7 @@ class FakingFiles:
                 if self._fuzzy_match(keyword, curr_word):
                     func()
                 # if the curr_word is longer than 1 word, fuzzy match 2 words (if they exist)
-                elif len(curr_word.split()) > 1 and len(self.read_data['text']) > self._i + 1 and \
+                elif len(keyword.split()) > 1 and len(self.read_data['text']) > self._i + 1 and \
                         self._fuzzy_match(keyword, curr_word + ' ' + self.read_data['text'][self._i + 1]):
                     func()
 
@@ -232,18 +232,19 @@ class FakingFiles:
 
     def process_date(self):
 
+
         # find the nearest words to verify what type of date it is
         nearest_words = []
         range_limit = self._i + 4
         for i in range(self._i, range_limit):
             i_of_next_word = self._find_next_regex_occurrence(r"[A-Za-z]{2,}", i)
             if i_of_next_word != -1 and i_of_next_word < range_limit:
-                next_word = self.read_data['text'][i]
+                next_word = self.read_data['text'][i_of_next_word]
                 nearest_words.append(next_word)
 
         for word in nearest_words:
             if self._fuzzy_match('urodzenia', word):
-                i_to_replace, formatting = self._next_date_position_and_formatting(self._i + 1)
+                i_to_replace, formatting = self._next_date_position_and_formatting(self._i)
                 if -1 < i_to_replace - self._i < 10:
                     self._add_to_dict(i_to_replace, 'birthdate')
                     self._date_formats.append(formatting)
@@ -509,7 +510,7 @@ class FakingFiles:
                     not self._are_on_same_height(start_pos, i) and \
                     top > start_top:
                 # check if better than current best
-                if best_top < top:
+                if best_top > top:
                     best_top = top
                     best_pos = i
 
@@ -609,7 +610,7 @@ class FakingFiles:
         """
         output = None  # they store [date_location, date_formatting]
         output_2 = None
-        regex = r"^\d{2}([-.\/])\d{2}\1\d{4}$"
+        regex = r"^\d{2}([-.\/])\d{2}\1\d{4}"
         date_location = self._find_next_regex_occurrence(regex, start_pos)
         if date_location != -1:
             date = self.read_data['text'][date_location]
@@ -621,7 +622,7 @@ class FakingFiles:
             elif '/' in date:
                 output = [date_location, "%d/%m/%Y"]
 
-        regex = r"^\d{4}([-.\/])\d{2}\1\d{2}$"
+        regex = r"^\d{4}([-.\/])\d{2}\1\d{2}"
         date_location = self._find_next_regex_occurrence(regex, start_pos)
         if date_location != -1:
             date = self.read_data['text'][date_location]
