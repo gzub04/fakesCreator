@@ -1,9 +1,9 @@
 import random
-from PIL import Image, ImageEnhance  # , ImageFilter
+from PIL import Image, ImageEnhance
 
 
 MAX_SCAN_ROTATION = 1.8
-MAX_PHOTO_ROTATION = None
+MAX_PHOTO_ROTATION = 4
 
 PAPER_PATH = "data/sources/textures"
 BACKGROUND_PATH = 'data/sources/textures/img_background.jpg'
