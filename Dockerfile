@@ -13,5 +13,4 @@ RUN pip3 install -r requirements.txt
 
 COPY . .
 
- CMD ["python3", "main.py", "--document", "training_document_0.jpg", "--type", "HospitalInformationSheet", "-n", "1", "--distort_type", "scan"]
-#CMD ["python3", "main.py", "--document", "training_document_0.jpg", "--type", "HospitalInformationSheet", "-n", "1", "--distort_type", "scan", "--only_distort"]
+ENTRYPOINT ["python3", "fakes_creator.py"]

@@ -343,7 +343,7 @@ class FakingFiles:
         zip_and_city_data = self._find_nearby_words(zip_and_city_i)
         # if one of the 2 last chars is a digit, it also contains the street
         if zip_and_city_data[2][-1].isdigit() or zip_and_city_data[2][-2].isdigit():
-            self._add_to_dict_multiple_merge(zip_and_city_data[0], 'zip_city_street',
+            self._add_to_dict_multiple_merge(zip_and_city_data[0], prefix + 'zip_city_street',
                                              zip_and_city_data[1] - zip_and_city_data[0] + 1)
         else:
             if self._are_on_same_height(street_i, zip_and_city_i):  # make sure they're on different lines
@@ -356,7 +356,7 @@ class FakingFiles:
             full_street_name = self._find_nearby_words(street_i)[2]
             # look for address - word(s) that end with a number or number and a letter
             while street_i != -1 and not (full_street_name[-1].isdigit() or full_street_name[-2].isdigit()) and \
-                    full_street_name.len() < 30:
+                    len(full_street_name) < 30:
                 street_i = self._find_regex_occurrence_below(r"[A-Za-z]{3,}", street_i, (x_min, x_max))
                 full_street_name = self._find_nearby_words(street_i)[2]
             if street_i == -1:

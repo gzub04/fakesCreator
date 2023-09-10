@@ -31,11 +31,11 @@ def parse_arguments():
 
     parser.add_argument('-n', type=int, help="Number of new documents to create")
     parser.add_argument('-t', '--type', type=str, required=True,
-                        help="Type of document to modify: \"HospitalInformationSheet\" or \"invoice\"")
+                        help="Type of document to modify: \"Hospital_sheet\" or \"invoice\"")
     parser.add_argument(
         '--only_distort', action='store_true',
         help="If you don't want to fake the file and only apply image distorting. "
-             "Exclusive with all other arguments except --document and --distort_type"
+             "Exclusive with --type"
     )
     parser.add_argument('--distort_type', choices=['photo', 'scan'],
                         help="How do you want your output image to look like: \"photo\" or \"scan\"")
@@ -148,7 +148,7 @@ def main():
     enhancer = distort.ImageDistorting()
 
     changes = {}  # dictionary containing changes on all faked files
-    with Bar("Creating new files...") as bar:
+    with Bar("Creating new files...", max=args['n']) as bar:
         for i in range(args['n']):
             new_pil_image = init_pil_image.copy()
             new_document_name = f"distorted_document_{i}.jpg"

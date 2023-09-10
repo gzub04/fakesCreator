@@ -15,7 +15,7 @@ def err_exit(err_msg):
 
 def docx_to_jpg(file_path) -> str:
     """
-    Coverts doc or docx file to jpg and saves it at the same location
+    Coverts odt, doc or docx file to jpg and saves it at the same location
     :param file_path: path to doc/docx file
     :return: path to generated jpg
     """
@@ -57,23 +57,3 @@ def pil_image_to_cv2(pil_image):
 
 def cv2_image_to_pil(cv2_image):
     return Image.fromarray(cv2.cvtColor(cv2_image, cv2.COLOR_BGR2RGB))
-
-
-# ---------- helpers for testing code ----------
-
-
-def save_test_data_to_csv(read_data):
-    output_file = "output/output_data.csv"
-
-    # Open the file for writing
-    with open(output_file, "w", encoding="utf-8") as file:
-        # Write the header row
-        headers = list(read_data.keys())
-        file.write("\t".join(headers) + "\n")
-
-        # Write the data rows
-        for i in range(len(read_data["text"])):
-            row = [str(read_data[key][i]) for key in headers]
-            file.write("\t".join(row) + "\n")
-
-    print(f"Data saved to {output_file}")
