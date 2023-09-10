@@ -132,10 +132,12 @@ class FakingFiles:
                 'recipient_zip_and_city': recipient['zip_and_city'],
                 'recipient_street': recipient['street'],
                 'recipient_NIP': recipient['NIP'],
+                'full_name': person['first_name'] + ' ' + person['last_name'],
                 'date': dates['start_date'],
                 'netto_price': 'netto',     # all prices are stored in prices dict
                 'vat_price': 'vat',
                 'brutto_price': 'brutto',
+                'blank': ' ',
             }
 
         changes_in_file = []  # list of boxes changed
@@ -311,6 +313,7 @@ class FakingFiles:
 
     def process_participant(self):
         participant = self.read_data['text'][self._i]
+        # prefixes only applicable only if party is a company
         if self._fuzzy_match('Sprzedawca', participant):
             prefix = 'seller_'
         elif self._fuzzy_match('Nabywca', participant):
@@ -320,41 +323,56 @@ class FakingFiles:
 
         x_min = self.read_data['left'][self._i]
         x_max = self.read_data['left'][self._i] + self.read_data['width'][self._i]
-        company_name = self._find_regex_occurrence_vertical(r"[A-Za-z]{3,}", self._i, 'down', (x_min, x_max))
-        if company_name == -1:
-            print(f"Warning: Found \"{self.read_data['text'][self._i]}\", but couldn't find information about company")
+        name = self._find_regex_occurrence_vertical(r"[A-Za-z]{3,}", self._i, 'down', (x_min, x_max))
+        if name == -1:
+            print(f"Warning: Found \"{self.read_data['text'][self._i]}\", but "
+                  f"could not find information about the party")
             return
-        self._find_nearby_and_add_to_dict(company_name, prefix + 'name')
 
-        zip_and_city = self._find_regex_occurrence_vertical(r"\d{2}-\d{3}", company_name, 'down', (x_min, x_max))
+        zip_and_city = self._find_regex_occurrence_vertical(r"\d{2}-\d{3}", name, 'down', (x_min, x_max))
         if zip_and_city == -1:
-            print(f"Warning: Found \"{self.read_data['text'][self._i]}\", but couldn't find company's zip code")
-            return
-        self._find_nearby_and_add_to_dict(zip_and_city, prefix + 'zip_and_city')
+            print(f"Warning: Found \"{self.read_data['text'][self._i]}\", but couldn't find party's zip code")
 
-        street = self._find_regex_occurrence_vertical(r"[A-Za-z]{3,}", company_name, 'down', (x_min, x_max))
+        street = self._find_regex_occurrence_vertical(r"[A-Za-z]{3,}", name, 'down', (x_min, x_max))
         if street == -1:
-            print(f"Warning: Found \"{self.read_data['text'][self._i]}\", but couldn't find company's street name")
-            return
-
-        if self._are_on_same_height(street, zip_and_city):
+            print(f"Warning: Found \"{self.read_data['text'][self._i]}\", but couldn't find party's street name")
+        elif self._are_on_same_height(street, zip_and_city):
             street = self._find_regex_occurrence_vertical(r"[A-Za-z]{3,}", street, 'down', (x_min, x_max))
+        if street == -1:    # check again
+            print(f"Warning: Found \"{self.read_data['text'][self._i]}\", but couldn't find party's street name")
 
-        self._find_nearby_and_add_to_dict(street, prefix + 'street')
-
-        NIP = self._find_regex_occurrence_vertical(r"^NIP:?$", company_name, 'down', (x_min, x_max))
+        # if no NIP, it's a private person
+        NIP = self._find_regex_occurrence_vertical(r"^NIP:?$", name, 'down', (x_min, x_max))
         if NIP == -1:
-            print(f"Warning: Found \"{self.read_data['text'][self._i]}\", but couldn't find company's NIP")
-            return
-        NIP = self._find_next_regex_occurrence(r"\d{10}\b", NIP)
-        self._find_nearby_and_add_to_dict(NIP, prefix + 'NIP')
+            print(f"Warning: Found \"{self.read_data['text'][self._i]}\", but could not find \"NIP\". "
+                  f"Assuming it's a private person.")
+            self._find_nearby_and_add_to_dict(name, 'full_name')
+        else:
+            NIP_num = self._find_next_regex_occurrence(r"\d{10}\b", NIP)
+            # different name and no NIP if private person
+            if NIP_num == -1 or NIP - NIP_num > 5:
+                # in the off-chance there is word "NIP", but no number
+                print(f"Warning: Found \"{self.read_data['text'][self._i]}\" and "
+                      f"\"{self.read_data['text'][NIP]}\", but couldn't find company's NIP number. "
+                      f"Assuming it's a private person")
+                self._find_nearby_and_add_to_dict(name, 'full_name')
+                self._find_nearby_and_add_to_dict(NIP_num, 'blank')
+            else:
+                self._find_nearby_and_add_to_dict(name, prefix + 'name')
+                self._find_nearby_and_add_to_dict(NIP_num, prefix + 'NIP')
+
+        self._find_nearby_and_add_to_dict(zip_and_city, prefix + 'zip_and_city')
+        self._find_nearby_and_add_to_dict(street, prefix + 'street')
 
     def process_price(self):
         fuzzy_price_type = self.read_data['text'][self._i]
         if self._fuzzy_match(fuzzy_price_type, 'netto'):
             price_type = 'netto_price'
         elif self._fuzzy_match(fuzzy_price_type, 'vat'):
-            price_type = 'vat_price'
+            if self._fuzzy_match(self.read_data['text'][self._i - 1], 'faktura'):
+                return
+            else:
+                price_type = 'vat_price'
         elif self._fuzzy_match(fuzzy_price_type, 'brutto'):
             price_type = 'brutto_price'
         else:
@@ -466,6 +484,15 @@ class FakingFiles:
         return start, end, output_string.strip()
 
     def _add_to_dict(self, position, type_of_data):
+        # check if not already edited
+        for i in range(len(self.data_to_change['type'])):
+            if self.data_to_change['top'][i] == self.read_data['top'][position] and \
+               self.data_to_change['left'][i] == self.read_data['left'][position] and \
+               self.data_to_change['width'][i] == self.read_data['width'][position] and \
+               self.data_to_change['height'][i] == self.read_data['height'][position]:
+                print(f"Warning: Trying to overwrite already detected box. Type of data: {type_of_data}")
+                return
+
         self.data_to_change['type'].append(type_of_data)
         self.data_to_change['top'].append(self.read_data['top'][position])
         self.data_to_change['left'].append(self.read_data['left'][position])
@@ -560,7 +587,6 @@ class FakingFiles:
 
         fontsize = 1
         font = ImageFont.truetype(FONT_PATH, fontsize)
-        print(text)
 
         # iterate until the text size is just larger than the criteria
         while font.getbbox(text)[3] < text_box.height:
