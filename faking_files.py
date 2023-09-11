@@ -99,6 +99,7 @@ class FakingFiles:
         phone_number = self.fake_data.create_phone_number()
         address = self.fake_data.create_address()
         rand_price_multiplier = random.uniform(0.7, 1.3)
+        colour = self._most_common_colour(cv_image)
 
         if self.file_type == 'hospital_sheet':
             keyword_to_name = {  # converts keyword to proper faked text
@@ -169,7 +170,6 @@ class FakingFiles:
             height = self.data_to_change['height'][i] + 2
 
             # put text on the image
-            colour = self._most_common_colour(cv_image)
             box_with_text = self._get_box_with_text(text, width, height, colour)
             box_width = box_with_text.shape[1]
             cv_image[y:y + height, x:x + box_width] = box_with_text
@@ -301,7 +301,7 @@ class FakingFiles:
                           f"but no following string, replacement not successful.")
                     return
                 # check if next is number, indicating that it's a street and its number, not city
-                next_number = self._find_next_regex_occurrence(r"\d+/\d+", i_to_replace + 1)
+                next_number = self._find_next_regex_occurrence(r"\d+", i_to_replace + 1)
                 next_word = self._find_next_regex_occurrence(r"[a-zA-Z]{2,}", i_to_replace + 1)
                 if next_number < next_word:
                     self._add_to_dict_multiple_merge(i_to_replace, 'street', next_number - i_to_replace + 1)
@@ -373,7 +373,7 @@ class FakingFiles:
                   f"Assuming it's a private person.")
             self._find_nearby_and_add_to_dict(name_i, 'full_name')
         else:   # if company
-            NIP_num = self._find_next_regex_occurrence(r"^\d{10}$", NIP)
+            NIP_num = self._find_next_regex_occurrence(r"\d{10}$", NIP)
             if NIP_num == -1 or NIP - NIP_num > 5:
                 # different name and no NIP if private person in the off-chance there is word "NIP", but no number
                 print(f"Warning: Found \"{self.read_data['text'][self._i]}\" and "

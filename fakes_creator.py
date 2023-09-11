@@ -23,10 +23,9 @@ def parse_arguments():
                                          "fake them while saving exact coordinates where they were modified."
     )
 
-    # mode = parser.add_mutually_exclusive_group(required=True)
     parser.add_argument('-d', '--document', type=str, required=True,
                         help="Path to the input document, supported types: jpg, png, bmp, pdf, odt, doc, docx")
-    parser.add_argument('--showcase', action='store_true', help="Creates an new image, marking with red boxes "
+    parser.add_argument('--showcase', action='store_true', help="Creates a new image, marking with red boxes "
                                                                 "all data that would be replaced")
 
     parser.add_argument('-n', type=int, help="Number of new documents to create")
