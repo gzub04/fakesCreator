@@ -13,11 +13,11 @@ def err_exit(err_msg):
     exit(1)
 
 
-def docx_to_jpg(file_path) -> str:
+def docx_to_bmp(file_path) -> str:
     """
-    Coverts odt, doc or docx file to jpg and saves it at the same location
+    Coverts odt, doc or docx file to bmp and saves it at the same location
     :param file_path: path to doc/docx file
-    :return: path to generated jpg
+    :return: path to generated bmp file
     """
     file_wo_extension, extension = file_path.rsplit('.', 1)
     extensions = ['odt', 'doc', 'docx']
@@ -28,25 +28,25 @@ def docx_to_jpg(file_path) -> str:
 
     doc2pdf.convert(file_path)
     pdf_file = file_wo_extension + '.pdf'
-    image = pdf_to_jpg(pdf_file)
+    image = pdf_to_bmp(pdf_file)
     os.remove(pdf_file)
 
     return image
 
 
-def pdf_to_jpg(file_path) -> str:
+def pdf_to_bmp(file_path) -> str:
     """
-    Converts pdf file to jpg and saves it at the same location
+    Converts pdf file to bmp and saves it at the same location
     :param file_path: path to pdf file
-    :return: path to generated jpg
+    :return: path to generated bmp
     """
     file_wo_extension, extension = file_path.rsplit('.', 1)
     if not extension == 'pdf':
         print("Error: expected .pdf file!")
         return ''
-    images = convert_from_path(file_path, fmt='jpg')
-    image_name = file_wo_extension + '.jpg'
-    images[0].save(image_name, "JPEG")
+    images = convert_from_path(file_path, fmt='bmp')
+    image_name = file_wo_extension + '.bmp'
+    images[0].save(image_name, "BMP")
 
     return image_name
 

@@ -63,7 +63,7 @@ def produce_new_init_document(filename):
     return 0
 
 
-def training_docx_to_jpg():
+def training_docx_to_bmp():
     """
     Converts training images to jpg
     :return: Returns 0 if successful, 1 if it couldn't find any docx at Data/sources/training_documents
@@ -72,10 +72,10 @@ def training_docx_to_jpg():
     # change docx to pdf
     docx_files = glob.glob(os.path.join(OUTPUT_DIRECTORY, "*.docx"))
     if not docx_files:
-        print("Warning: not docx files found to convert to jpg!")
+        print("Warning: not docx files found to convert to bmp!")
         return 1
     for word_file in docx_files:
-        utils.docx_to_jpg(word_file)
+        utils.docx_to_bmp(word_file)
         os.remove(word_file)
 
     return 0
@@ -90,5 +90,5 @@ def generate_training_documents(amount):
         if produce_new_init_document(output_name):
             return 1
 
-    if training_docx_to_jpg():
+    if training_docx_to_bmp():
         return 1

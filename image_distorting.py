@@ -1,18 +1,19 @@
 import random
 from PIL import Image, ImageEnhance
 
+import utils
 
 MAX_SCAN_ROTATION = 1.8
 MAX_PHOTO_ROTATION = 4
 
 PAPER_PATH = "data/sources/textures"
-BACKGROUND_PATH = 'data/sources/textures/img_background.jpg'
+BACKGROUND_PATH = 'data/sources/textures'
 
 
 class ImageDistorting:
     def __init__(self):
         self.paper_textures = []
-        self.background = None
+        self.backgrounds = []
 
         # paper textures
         for texture_num in range(1, 7):
@@ -28,19 +29,21 @@ class ImageDistorting:
                 print(f"Permission Error: Can't access {path_to_img}")
                 exit(1)
 
-        # background texture
-        try:
-            background_texture = Image.open(BACKGROUND_PATH)
-            self.background = background_texture
-        except FileNotFoundError:
-            print(f"File Not Found Error: Missing {BACKGROUND_PATH}")
-            exit(1)
-        except PermissionError:
-            print(f"Permission Error: Can't access {BACKGROUND_PATH}")
-            exit(1)
+        # background textures
+        for texture_num in range(1, 4):
+            path_to_img = f"{BACKGROUND_PATH}/background_texture_{texture_num}.jpg"
+            try:
+                texture = Image.open(path_to_img)
+                self.backgrounds.append(texture)
+            except FileNotFoundError:
+                print(f"File Not Found Error: Missing {path_to_img}")
+                exit(1)
+            except PermissionError:
+                print(f"Permission Error: Can't access {path_to_img}")
+                exit(1)
 
     def _apply_paper_texture(self, image):
-        if random.randint(1, 10) == 10:
+        if random.randint(1, 100) > 90:
             # choose crumpled paper
             choice = random.randint(4, 5)
         else:
@@ -79,13 +82,14 @@ class ImageDistorting:
             extend_image = 64
             width += extend_image
             height += extend_image
-            output_image = self.background.resize((width, height))
+
+            background_texture = self.backgrounds[random.randint(0, 2)]
+            output_image = background_texture.resize((width, height))
             output_image.paste(rotated_pil_image, (32, 32), mask)
 
             rotated_pil_image.close()
         else:
-            print(f"Error: unknown img_type \"{img_type}\" in rotate_img function")
-            exit(1)
+            utils.err_exit(f"Error: unknown img_type \"{img_type}\" in rotate_img function")
 
         # note changes in image
         in_width, in_height = pil_image.size
@@ -108,7 +112,7 @@ class ImageDistorting:
 
         enhancer = ImageEnhance.Sharpness(output_image)
         sharpness = random.uniform(-1, 3)
-        output_image = enhancer.enhance(-sharpness)
+        output_image = enhancer.enhance(sharpness)
 
         return output_image
 

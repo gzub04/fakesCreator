@@ -8,7 +8,7 @@ from fuzzywuzzy import fuzz
 import fake_data_creator
 import utils
 
-FONT_PATH = 'data/sources/Arial.ttf'
+FONT_PATH = 'data/sources/font.ttf'
 
 
 class FakingFiles:
@@ -21,11 +21,12 @@ class FakingFiles:
         self.init_image = init_cv2_image
         self.read_data = read_data
         self.fake_data = fake_data_creator.FakeDataCreator()
-        self.data_to_change = {'type': [],  # what type of word should it be replaced with, e.g. first_name
-                               'top': [],  # coordinates of top border
-                               'left': [],  # coordinate of left border
-                               'width': [],  # width of box
-                               'height': []  # height of box
+        self.data_to_change = {'type': [],      # what type of word should it be replaced with, e.g. first_name
+                               'top': [],       # coordinates of top border
+                               'left': [],      # coordinate of left border
+                               'width': [],     # width of box
+                               'height': [],    # height of box
+                               'font_size': []   # font size
                                }
         self._i = 0  # used to iterate through data from tesseract
         self._date_formats = []  # stores format of dates in order
@@ -93,13 +94,13 @@ class FakingFiles:
             'vat': 0,
             'gross': 0,
             'date': 0,
+            'font_size': 0,
         }
         person = self.fake_data.create_person()
         dates = self.fake_data.create_dates()
         phone_number = self.fake_data.create_phone_number()
         address = self.fake_data.create_address()
         rand_price_multiplier = random.uniform(0.7, 1.3)
-        colour = self._most_common_colour(cv_image)
 
         if self.file_type == 'hospital_sheet':
             keyword_to_name = {  # converts keyword to proper faked text
@@ -115,6 +116,8 @@ class FakingFiles:
                 'phone_number': phone_number,
                 'city': address['city'],
                 'street': address['street'],
+                'street_and_city': f"{address['street']}, {address['city']}",
+                'city_and_street': f"{address['city']}, {address['street']}"
             }
         elif self.file_type == 'invoice':
             buyer = self.fake_data.create_company()
@@ -170,9 +173,13 @@ class FakingFiles:
             height = self.data_to_change['height'][i] + 2
 
             # put text on the image
-            box_with_text = self._get_box_with_text(text, width, height, colour)
+            font_size = self.data_to_change['font_size'][iterators['font_size']]
+            colour_check = cv_image[y:y+height, x:x+width]
+            colour = self._most_common_colour(colour_check)
+            box_with_text = self._get_box_with_text(text, width, height, colour, font_size)
             box_width = box_with_text.shape[1]
-            cv_image[y:y + height, x:x + box_width] = box_with_text
+            box_height = box_with_text.shape[0]
+            cv_image[y:y + box_height, x:x + box_width] = box_with_text
             altered_box = {
                 'type': current_keyword,
                 'text': text,
@@ -184,6 +191,60 @@ class FakingFiles:
             changes_in_file.append(altered_box)
 
         return changes_in_file
+
+    def process_first_name(self):
+        up_limit = self._i + 3 if self._i + 3 < len(self.read_data['text']) else len(self.read_data['text'])
+        surname_flag = False
+        for i in range(self._i, up_limit):
+            curr_word = self.read_data['text'][self._i + i]
+            if self._fuzzy_match("nazwisko", curr_word):
+                surname_flag = True
+            if ':' in self.read_data['text'][i]:
+                i_to_replace = self._find_next_regex_occurrence(r"[a-zA-Z]{2,}", i + 1)  # find first name
+                if i_to_replace == -1 or i_to_replace - i > 3:
+                    print(f"Warning: \"{self.read_data[i_to_replace]}\" found, "
+                          f"but no following string, replacement was not successful.")
+                    return
+                self._i = i_to_replace
+
+                if surname_flag:
+                    i_last_name = self._find_next_regex_occurrence(r"[a-zA-Z]{2,}", i_to_replace + 1)  # find last name
+                    if i_last_name == -1 or i_last_name - i > 3:
+                        print(f"Warning: \"{self.read_data[i_to_replace]}\" found, but failed to replace last name.")
+                        self._add_to_dict(i_to_replace, 'first_name')  # add only first name
+                        return
+                    self._add_to_dict_multiple_merge(i_to_replace, 'full_name', 2)  # replace first_name and last_name
+                    self._i = i_last_name
+                else:
+                    self._add_to_dict(i_to_replace, 'first_name')
+                return
+
+    def process_surname(self):
+        up_limit = self._i + 3 if self._i + 3 < len(self.read_data['text']) else len(self.read_data['text'])
+        firstname_flag = False
+        for i in range(self._i, up_limit):
+            curr_word = self.read_data['text'][self._i + i]
+            if self._fuzzy_match("imię", curr_word):
+                surname_flag = True
+            if ':' in self.read_data['text'][i]:
+                i_to_replace = self._find_next_regex_occurrence(r"[a-zA-Z]{2,}", i + 1)  # find first name
+                if i_to_replace == -1 or i_to_replace - i > 3:
+                    print(f"Warning: \"{self.read_data[i_to_replace]}\" found, "
+                          f"but no following string, replacement was not successful.")
+                    return
+                self._i = i_to_replace
+
+                if firstname_flag:
+                    i_last_name = self._find_next_regex_occurrence(r"[a-zA-Z]{2,}", i_to_replace + 1)  # find last name
+                    if i_last_name == -1 or i_last_name - i > 3:
+                        print(f"Warning: \"{self.read_data[i_to_replace]}\" found, but failed to replace last name.")
+                        self._add_to_dict(i_to_replace, 'last_name')  # add only first name
+                        return
+                    self._add_to_dict_multiple_merge(i_to_replace, 'full_name', 2)  # replace first_name and last_name
+                    self._i = i_last_name
+                else:
+                    self._add_to_dict(i_to_replace, 'last_name')
+                return
 
     def process_patient(self):
         current = self.read_data['text'][self._i].rstrip()
@@ -213,7 +274,7 @@ class FakingFiles:
         print('Warning: "Pacjent" found, but could not detect a place to swap')
 
     def process_sex(self):
-        i_to_replace = self._find_next_regex_occurrence(r"^(M|F)$", self._i + 1)
+        i_to_replace = self._find_next_regex_occurrence(r"^(M|K)$", self._i + 1)
         if i_to_replace == -1 or i_to_replace - self._i > 5:
             print(f"'Warning: \"{self.read_data['text'][self._i]}\" found, "
                   f"but failed to find sex to replace.")
@@ -231,7 +292,6 @@ class FakingFiles:
         self._i = i_to_replace
 
     def process_date(self):
-
 
         # find the nearest words to verify what type of date it is
         nearest_words = []
@@ -300,18 +360,11 @@ class FakingFiles:
                     print(f"Warning: \"{self.read_data[self._i]}\" found, "
                           f"but no following string, replacement not successful.")
                     return
-                # check if next is number, indicating that it's a street and its number, not city
-                next_number = self._find_next_regex_occurrence(r"\d+", i_to_replace + 1)
-                next_word = self._find_next_regex_occurrence(r"[a-zA-Z]{2,}", i_to_replace + 1)
-                if next_number < next_word:
-                    self._add_to_dict_multiple_merge(i_to_replace, 'street', next_number - i_to_replace + 1)
-                    self._add_to_dict(next_word, 'city')
-                    self._i = next_word
+                full_address = self._find_nearby_words(self._i)
+                if re.search(r"\d", self.read_data['text'][full_address[1]]):
+                    self._add_to_dict_multiple_merge(i_to_replace, 'city_and_street', full_address[1] - i_to_replace + 1)
                 else:
-                    # city first, street after
-                    self._add_to_dict(i_to_replace, 'city')
-                    self._add_to_dict_multiple_merge(next_word, 'street', next_number - next_word + 1)
-                    self._i = next_number - next_word + 1
+                    self._add_to_dict_multiple_merge(i_to_replace, 'street_and_city', full_address[1] - i_to_replace + 1)
                 return
 
         print(f"Warning: \"{self.read_data[self._i]}\" found, "
@@ -567,6 +620,8 @@ class FakingFiles:
         self.data_to_change['left'].append(self.read_data['left'][position])
         self.data_to_change['width'].append(self.read_data['width'][position])
         self.data_to_change['height'].append(self.read_data['height'][position])
+        font_size = self._get_font_size(position)
+        self.data_to_change['font_size'].append(font_size)
 
     def _add_to_dict_multiple_merge(self, position, type_of_data, num_to_merge):
         """
@@ -574,32 +629,52 @@ class FakingFiles:
         :param position: position in self.read_data
         :param type_of_data:
         :param num_to_merge:
-        :return:
+        :return: None
         """
         self.data_to_change['type'].append(type_of_data)
         top = float('inf')
         bottom = 0
         left = float('inf')
         right = 0
+        font_size = float('inf')
         for i in range(num_to_merge):
             curr_top = self.read_data['top'][position + i]
             curr_left = self.read_data['left'][position + i]
             curr_width = self.read_data['width'][position + i]
             curr_height = self.read_data['height'][position + i]
+            curr_fontsize = self._get_font_size(position + i)
 
             top = min(top, curr_top)
             bottom = max(bottom, curr_top + curr_height)
             left = min(left, curr_left)
             right = max(right, curr_left + curr_width)
+            font_size = min(font_size, curr_fontsize)
 
         self.data_to_change['top'].append(top)
         self.data_to_change['left'].append(left)
         self.data_to_change['width'].append(right - left)
         self.data_to_change['height'].append(bottom - top)
+        self.data_to_change['font_size'].append(font_size)
 
     def _find_nearby_and_add_to_dict(self, position, type_of_data):
         start, end, text = self._find_nearby_words(position)
         self._add_to_dict_multiple_merge(start, type_of_data, end - start + 1)
+
+    def _get_font_size(self, position):
+        """
+        Checks for the font size
+        :param position: position of the word to check
+        :return: font size
+        """
+        height = self.read_data['height'][position]
+
+        if any(letter in self.read_data['text'][position] for letter in ['g', 'j', 'p', 'q', 'y']):
+            font_size = round(0.96 * height)
+        elif any(letter in self.read_data['text'][position] for letter in ['Ą', 'Ę', 'ą', 'ę']):
+            font_size = round(1.1 * height)
+        else:
+            font_size = round(1.3 * height)
+        return font_size
 
     def _next_date_position_and_formatting(self, start_pos):
         """
@@ -652,22 +727,17 @@ class FakingFiles:
         return True if abs(top_1 - top_2) < max_misalignment else False
 
     @staticmethod
-    def _get_box_with_text(text, width, height, colour):
+    def _get_box_with_text(text, width, height, colour, font_size):
         text_box = Image.new('RGB', (width, height), colour)
-
-        fontsize = 1
-        font = ImageFont.truetype(FONT_PATH, fontsize)
-
-        # iterate until the text size is just larger than the criteria
-        while font.getbbox(text)[3] < text_box.height:
-            fontsize += 1
-            font = ImageFont.truetype(FONT_PATH, fontsize)
+        font = ImageFont.truetype(FONT_PATH, font_size)
 
         if font.getlength(text) > text_box.width:
             text_box = text_box.resize((int(font.getlength(text, language='pl')), text_box.height))
+        if font.getbbox(text)[3] > text_box.height:
+            text_box = text_box.resize((text_box.size[0], font.getbbox(text)[3]))
 
         draw = ImageDraw.Draw(text_box)
-        draw.text((0, 0), text, font=font, fill=(0, 0, 0, 255))  # put text on img
+        draw.text((0, 0), text, font=font, fill=(70, 70, 70, 255))  # put text on img
 
         return utils.pil_image_to_cv2(text_box)  # return in cv2 format
 
@@ -685,4 +755,15 @@ class FakingFiles:
         a2D = cv2_image.reshape(-1, cv2_image.shape[-1])
         col_range = (256, 256, 256)  # generically : a2D.max(0)+1
         a1D = np.ravel_multi_index(a2D.T, col_range)
-        return np.unravel_index(np.bincount(a1D).argmax(), col_range)
+        bin_count = np.bincount(a1D)
+
+        for i in range(100):
+            most_frequent_index = np.argmax(bin_count)
+            most_common_colour = np.unravel_index(most_frequent_index, col_range)
+            if all(value > 130 for value in most_common_colour):
+                break
+            bin_count[most_frequent_index] = 0
+        if most_common_colour == (255, 255, 255):
+            print(cv2_image)
+
+        return most_common_colour

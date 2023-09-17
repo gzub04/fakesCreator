@@ -42,7 +42,7 @@ def parse_arguments():
 
     if args['showcase'] and any([args['n'], args['distort_type']]) and args['only_distort'] is True:
         utils.err_exit("--showcase can only be used only with --document and --type")
-    elif not args['showcase'] and all(arg is None for arg in [args['n'], args['distort_type']]):
+    elif not args['showcase'] and any(arg is None for arg in [args['n'], args['distort_type']]):
         utils.err_exit("Missing -n or --distort_type arguments")
 
     return args
@@ -96,9 +96,9 @@ def main():
     # check what type of file
     file_wo_extension, extension = args['document'].rsplit('.', 1)
     if extension == 'doc' or extension == 'docx' or extension == 'odt':
-        args['document'] = utils.docx_to_jpg(args['document'])
+        args['document'] = utils.docx_to_bmp(args['document'])
     elif extension == 'pdf':
-        args['document'] = utils.pdf_to_jpg(args['document'])
+        args['document'] = utils.pdf_to_bmp(args['document'])
     elif not extension == 'jpg' and not extension == 'png' and not extension == 'bmp':
         utils.err_exit(f"Unsupported file extension {extension}!")
     if args['document'] == '':

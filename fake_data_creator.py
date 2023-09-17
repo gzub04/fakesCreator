@@ -50,7 +50,7 @@ class FakeDataCreator:
         :return: Dictionary with keys: first_name, last_name, sex, birthdate and PESEL.
         birthdate is datetime datatype, all others are strings
         """
-        person = {'sex': choice(['M', 'F'])}
+        person = {'sex': choice(['M', 'K'])}
 
         if person['sex'] == 'M':
             person['first_name'] = choice(self.male_first_names).rstrip('\n').capitalize()
@@ -128,7 +128,7 @@ class FakeDataCreator:
     def create_company(self):
         nums = [random.randint(0, 9) for _ in range(5)]  # for zip code
         zip_code = f"{nums[0]}{nums[1]}-{nums[2]}{nums[3]}{nums[4]}"
-        NIP = random_digits = ''.join(random.choice('0123456789') for _ in range(10))
+        NIP = ''.join(random.choice('0123456789') for _ in range(10))
         address = self.create_address()
         company = {
             'name': choice(self.company_names).rstrip('\n').capitalize(),
