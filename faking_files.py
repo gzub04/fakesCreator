@@ -1,5 +1,6 @@
 import random
 import re
+from collections import Counter
 
 import numpy as np
 from PIL import Image, ImageDraw, ImageFont
@@ -174,7 +175,7 @@ class FakingFiles:
 
             # put text on the image
             font_size = self.data_to_change['font_size'][iterators['font_size']]
-            colour_check = cv_image[y:y+height, x:x+width]
+            colour_check = cv_image[y - (height//6), x:x + width]
             colour = self._most_common_colour(colour_check)
             box_with_text = self._get_box_with_text(text, width, height, colour, font_size)
             box_width = box_with_text.shape[1]
@@ -752,18 +753,15 @@ class FakingFiles:
 
     @staticmethod
     def _most_common_colour(cv2_image):
-        a2D = cv2_image.reshape(-1, cv2_image.shape[-1])
-        col_range = (256, 256, 256)  # generically : a2D.max(0)+1
-        a1D = np.ravel_multi_index(a2D.T, col_range)
-        bin_count = np.bincount(a1D)
+        # Reshape the ndarray into a 2D array of RGB tuples
+        pixels = cv2_image.reshape(-1, 3)
+        # Convert the 2D array to a list of tuples
+        pixels_list = [tuple(pixel) for pixel in pixels]
+        # Use Counter to count the occurrences of each RGB tuple
+        pixel_counts = Counter(pixels_list)
 
-        for i in range(100):
-            most_frequent_index = np.argmax(bin_count)
-            most_common_colour = np.unravel_index(most_frequent_index, col_range)
-            if all(value > 130 for value in most_common_colour):
-                break
-            bin_count[most_frequent_index] = 0
-        if most_common_colour == (255, 255, 255):
-            print(cv2_image)
+        most_common_color = pixel_counts.most_common(1)[0][0]
 
-        return most_common_colour
+        if any(val < 150 for val in most_common_color):
+            most_common_color = pixel_counts.most_common(2)[1][0]
+        return most_common_color
